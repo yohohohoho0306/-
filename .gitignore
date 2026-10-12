@@ -12,3 +12,5 @@ env/
 *.csv
 *.md.out
 .DS_Store
+.cache/
+results/
