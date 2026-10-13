@@ -140,6 +140,13 @@ def _closer_to_split(observed: float, split: float) -> bool:
     return observed > 0 and abs(math.log(observed / split)) < abs(math.log(observed))
 
 
+def _implied_shares(p: FiscalPeriod) -> Optional[float]:
+    """純利益 ÷ EPS（その期の EPS の基準になっている株数の目安）."""
+    if p.net_income and p.eps and p.net_income / p.eps > 0:
+        return p.net_income / p.eps
+    return None
+
+
 def _score(values: list[Optional[float]]) -> float:
     """配当の推移のなめらかさ（隣り合う期の変化率の対数の絶対値の和。小さいほど自然）."""
     total = 0.0
@@ -378,6 +385,38 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
                             setattr(merged[k], attr, getattr(merged[k], attr) / split)
                 break
 
+    # 1b) それでも基準のずれが残る期を割り戻す。上場前の大きな分割は、有報が一部の期だけを
+    #     分割後の基準に直すことがあり（MacbeePlanet: 1→1,500 分割を 2018/4 期以降だけ直し、
+    #     2017/4 期は直していない）、株式数の変化も増資と重なって分割の倍率にならない。
+    #     純利益 ÷ EPS（EPS の基準の株数）が前期の 10 倍以上に飛び、期末の発行済株式数の変化では
+    #     説明できない（大量の増資ではない）ものに限る
+    for i in range(len(merged) - 1, 0, -1):
+        a, b = merged[i - 1], merged[i]
+        ia, ib = _implied_shares(a), _implied_shares(b)
+        if ia is None or ib is None:
+            continue
+        r = ib / ia
+        if 0.1 < r < 10:
+            continue
+        if a.shares and b.shares and r / 1.35 <= b.shares / a.shares <= r * 1.35:
+            continue
+        factor = float(round(r)) if r >= 10 else 1 / round(1 / r)
+        for k in range(i):
+            for attr in ("eps", "bps", "eps_parent"):
+                if getattr(merged[k], attr) is not None:
+                    setattr(merged[k], attr, getattr(merged[k], attr) / factor)
+            # 1 株配当は、株式数の変化から見つけた分割（2) で割り戻す）で足りない分だけ割り戻す
+            handled = math.prod(s for m, s in split_at.items() if k < m <= i)
+            rest = factor / handled
+            if abs(math.log(rest)) > 0.05:
+                for attr in ("dps", "interim_dps"):
+                    if getattr(merged[k], attr):
+                        setattr(merged[k], attr, getattr(merged[k], attr) / rest)
+        notes.append(f"{b.end} 期より前の1株指標が分割後の基準に直されていないとみられる"
+                     f"（純利益÷EPS の株数が {r:,.0f} 倍に飛ぶ）ため {factor:g} で割り戻した" if r >= 10 else
+                     f"{b.end} 期より前の1株指標が併合後の基準に直されていないとみられる"
+                     f"（純利益÷EPS の株数が {r:.3f} 倍に飛ぶ）ため {factor:g} で割り戻した")
+
     # 2) 1 株配当を分割の基準にそろえる（新しい分割から）
     for i, split, ex_date, how in sorted(found, reverse=True):
         cur = merged[i]
@@ -393,8 +432,12 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
                 if j < m < i:
                     between *= r
             decided = _payout_says_unrestated(merged[j], split, between, offset)
-            if decided is None and abs(math.log(split)) >= math.log(1.4):
-                decided = _yahoo_says_unrestated(merged[j], known_dividends, reverse_cut, known, split, between, later)
+            if abs(math.log(split)) >= math.log(1.4):
+                # 配当性向は、後の有報で「分割後の EPS」と「支払った配当」から計算し直されていることがある
+                # （MacbeePlanet 2024/4 期: 56 円 ÷ 85.37 円 ＝ 65.6%）。Yahoo の配当履歴と食い違えば Yahoo に従う
+                yahoo = _yahoo_says_unrestated(merged[j], known_dividends, reverse_cut, known, split, between, later)
+                if yahoo is not None:
+                    decided = yahoo
             if decided is not None:
                 per_period[j] = decided
         default = basis != "restated"
@@ -419,15 +462,25 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
     for prev, cur in zip(merged, merged[1:]):
         if prev.standard and cur.standard and prev.standard != cur.standard:
             notes.append(f"{cur.end} 期から会計基準が {prev.standard}→{cur.standard} に変わる（前後の EPS・BPS は基準が異なる）")
-    no_div = [p.end for p in merged if p.dps_assumed_zero]
+    # 1 株配当の欄が報告書ごと空の古い期（上場前から無配の会社など）は、Yahoo の配当履歴で
+    # 最初の配当より前に終わった期なら無配とみなす（MacbeePlanet: 初配は 2024/4 期）
+    paid = [d for d, v in (known_dividends or []) if v and v > 0]
+    by_yahoo = [p for p in merged if paid and p.dps is None and p.end < min(paid)]
+    for p in by_yahoo:
+        p.dps, p.dps_assumed_zero = 0.0, True
+    if by_yahoo:
+        notes.append("1株配当の欄が無い期（" + ", ".join(str(p.end) for p in by_yahoo)
+                     + f"）は、Yahoo の配当履歴の最初の配当（{min(paid)}）より前なので無配とみなした")
+    no_div = [p.end for p in merged if p.dps_assumed_zero and all(p is not q for q in by_yahoo)]
     if no_div:
         notes.append("1株配当の欄が空の期（" + ", ".join(str(d) for d in no_div) + "）は無配とみなした")
     estimated = [p for p in merged if p.bps_source]
     if estimated:
         sources = "・".join(dict.fromkeys(p.bps_source for p in estimated))
         notes.append(f"BPS を表から直接取れない期が {len(estimated)} 期（{sources}）")
+    # 連結と個別の値が混ざる系列だけ注記する（ずっと個別の会社は注記しない）
     parent_only = [p.end for p in merged if p.nonconsolidated]
-    if parent_only:
+    if parent_only and len(parent_only) < len(merged):
         notes.append(f"{parent_only[0]}〜{parent_only[-1]} 期の {len(parent_only)} 期は連結の値が無く、個別の値を使用")
     for p in merged:
         if p.months is not None and p.months < 12:

@@ -101,6 +101,17 @@ def test_build_report_nonconsolidated_only_company():
     report = build_report(*parse_instance(make_instance(five_periods(), nonconsolidated_only=True)), doc_id="X")
     assert report.consolidated is False
     assert report.latest.eps == 140 and report.latest.bps == 1400
+    assert all(p.nonconsolidated for p in report.periods)
+    assert not any("個別の値" in n for n in merge_reports([report]).notes)  # ずっと個別なら注記しない
+
+
+def test_merge_notes_older_report_without_consolidated_statements():
+    # アイエックス・ナレッジ型: 古い有報は連結財務諸表を作っておらず、全期が個別の値
+    newer = build_report(*parse_instance(make_instance(five_periods(2022))), doc_id="new")
+    older = build_report(*parse_instance(make_instance(five_periods(2018), nonconsolidated_only=True)), doc_id="old")
+    h = merge_reports([newer, older])
+    assert [p.nonconsolidated for p in h.periods] == [True] * 4 + [False] * 5
+    assert "2018-03-31〜2021-03-31 期の 4 期は連結の値が無く、個別の値を使用" in h.notes
 
 
 def test_build_report_uses_parent_values_before_consolidation_started():
@@ -220,6 +231,58 @@ def test_merge_fixes_unadjusted_eps_bps_inside_one_report():
     assert [p.bps for p in h.periods] == pytest.approx([500, 540, 590, 640, 700])
     assert [p.eps for p in h.periods][:2] == pytest.approx([50, 55])
     assert any("未修正" in n for n in h.notes)
+
+
+def test_merge_fixes_pre_ipo_period_left_on_old_basis():
+    # MacbeePlanet 型: 上場前の 1→1,500 分割（と増資）を、有報は 2018 期以降だけ直し、2017 期（880 株）は直していない
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2017, 77517.65, 87554.82, None, 880, ni=68_215_000),
+        fp(2018, 30.12, 59.31, None, 1760, ni=79_525_000),
+        fp(2019, 52.82, 112.13, None, 1760, ni=139_447_000),
+        fp(2020, 98.70, 429.58, None, 3_097_900, ni=263_863_000),
+        fp(2021, 174.54, 591.09, 10, 3_198_400, ni=551_458_000),
+    ])
+    h = merge_reports([report])
+    assert h.periods[0].eps == pytest.approx(77517.65 / 3000) and h.periods[0].bps == pytest.approx(87554.82 / 3000)
+    assert [p.eps for p in h.periods[1:]] == [30.12, 52.82, 98.70, 174.54]
+    assert all(b.bps > a.bps for a, b in zip(h.periods, h.periods[1:]))
+    assert any("3,000 倍に飛ぶ）ため 3000 で割り戻した" in n for n in h.notes)
+
+
+def test_merge_treats_blank_dividends_before_first_yahoo_dividend_as_none_paid():
+    # 古い有報は1株配当の欄が全期空（上場前から無配）。Yahoo の配当履歴は 2025 年から
+    newer = AnnualReport(doc_id="new", periods=[fp(y, 100 + y - 2022, 1000 + y, d, 1_000_000)
+                                                for y, d in ((2022, 0), (2023, 0), (2024, 0), (2025, 10), (2026, 12))])
+    older = AnnualReport(doc_id="old", periods=[fp(y, 90 + y - 2018, 900 + y, None, 1_000_000) for y in range(2018, 2023)])
+    h = merge_reports([newer, older], known_dividends=[(date(2025, 3, 27), 10.0), (date(2026, 3, 27), 12.0)])
+    assert [p.dps for p in h.periods] == [0, 0, 0, 0, 0, 0, 0, 10, 12]
+    assert any("Yahoo の配当履歴の最初の配当（2025-03-27）より前" in n for n in h.notes)
+    # Yahoo の配当履歴が無ければ空のまま（判定不能）
+    assert merge_reports([newer, older]).periods[0].dps is None
+
+
+def test_merge_prefers_yahoo_when_restated_payout_ratio_mixes_bases():
+    # MacbeePlanet 型: 期末後の 1→4 分割。後の有報は EPS だけ分割後の基準に直し、配当（56 円）は支払った額のまま、
+    # 配当性向は 56 ÷ 85.37 ＝ 65.6% と計算し直している。Yahoo の分割調整後の配当は 14 円
+    periods = [fp(2023, 60, 500, 0, 3_500_000), fp(2024, 85.37, 600, 56, 3_663_568),
+               fp(2025, 136.82, 700, 36, 14_654_272), fp(2026, 236.22, 800, 55, 14_654_272)]
+    periods[1].payout, periods[1].eps_parent = 0.656, 85.37
+    periods[1].interim_dps = 56
+    h = merge_reports([AnnualReport(doc_id="r", periods=periods)], known_splits=[(date(2024, 5, 30), 4.0)],
+                      known_dividends=[(date(2023, 10, 30), 14.0), (date(2024, 10, 30), 18.0),
+                                       (date(2025, 4, 28), 18.0), (date(2026, 4, 28), 55.0)])
+    assert [p.dps for p in h.periods] == pytest.approx([0, 14, 36, 55])
+
+
+def test_merge_keeps_eps_after_large_share_issue():
+    # 大量の増資（株式数 12 倍）で EPS が本当に薄まった場合は割り戻さない
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2022, 500, 5000, 0, 1_000_000, ni=500_000_000), fp(2023, 50, 900, 0, 12_000_000, ni=600_000_000),
+        fp(2024, 60, 950, 0, 12_000_000, ni=720_000_000),
+    ])
+    h = merge_reports([report])
+    assert [p.eps for p in h.periods] == [500, 50, 60]
+    assert not any("割り戻した" in n for n in h.notes)
 
 
 def test_merge_fixes_eps_bps_restated_only_for_current_and_prior_year():

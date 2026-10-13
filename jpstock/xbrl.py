@@ -118,7 +118,7 @@ class FiscalPeriod:
     dps_assumed_zero: bool = False  # 1 株配当の欄が空（「－」）なので無配とみなした
     payout: Optional[float] = None  # 配当性向（提出会社、0.355 のような小数）
     eps_parent: Optional[float] = None  # 提出会社の 1 株当たり当期純利益（配当性向の計算の基準）
-    nonconsolidated: bool = False  # 連結の報告書だが、この期は個別の値で補った
+    nonconsolidated: bool = False  # 個別の値（連結財務諸表を作らない会社の報告書、または連結の欄が空の期）
     standard: Optional[str] = None  # EPS を取った要素の会計基準（JP / IFRS / US）
 
     @property
@@ -376,7 +376,7 @@ def build_report(
             _pick(facts, CONSOLIDATED_METRICS[m], idx, _KIND[m], nonconsolidated=False) is None
             for m in ("eps", "bps")
         )
-        period = FiscalPeriod(end=end, start=start, nonconsolidated=has_consolidated and use_parent)
+        period = FiscalPeriod(end=end, start=start, nonconsolidated=use_parent)
         # 会計基準を移行した年は同じ期に複数の基準の値が載るので、EPS と同じ基準の要素を優先する
         _, eps_element = _pick_named(facts, CONSOLIDATED_METRICS["eps"], idx, "Duration", use_parent)
         standard = _standard_of(eps_element)
