@@ -520,6 +520,7 @@ def test_run_pipeline_end_to_end(tmp_path):
 
     md = screen.render_markdown(rows, date(2026, 10, 12))
     assert "会社1111" in md and "### 金融（別枠）" in md and "会社3333" in md
+    assert screen.display_name("株式会社\u3000極洋") == "極洋"
     out = tmp_path / "all.csv"
     screen.write_csv(rows, out)
     assert out.read_text(encoding="utf-8-sig").count("\n") == len(rows) + 1

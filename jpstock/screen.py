@@ -230,6 +230,13 @@ def _f(value: Optional[float], digits: int = 2) -> str:
     return "" if value is None else f"{value:.{digits}f}"
 
 
+def display_name(name: str) -> str:
+    """表示用の会社名（「株式会社」と空白を除く）."""
+    for word in ("株式会社", "（株）", "(株)"):
+        name = name.replace(word, "")
+    return name.replace("\u3000", "").strip()
+
+
 def _oku(value: Optional[float]) -> str:
     return "" if value is None else f"{value / 1e8:,.0f}億円"
 
@@ -243,10 +250,10 @@ def _policy(s3: Optional[Stage3]) -> str:
 
 CSV_COLUMNS = [
     "コード", "銘柄名", "業種", "金融", "判定", "株価", "株価日付", "直近決算期末",
-    "PER(実績)", "PBR", "ROE", "ROA", "配当利回り(実績)", "自己資本比率", "時価総額(億円)",
+    "PER(実績)", "PBR", "ROE", "ROA", "配当利回り(実績)", "1株配当(実績)", "自己資本比率", "時価総額(億円)",
     "第1段階 不合格項目", "第1段階 未確認項目",
     "期数", "EPS 9期前", "EPS 直近", "EPS倍率", "赤字期", "BPS 9期前", "BPS 直近", "BPS伸び率",
-    "BPS連続増加回数", "BPS減少期", "減配期", "無配転落期", "第2段階 不合格項目", "第2段階 未確認項目",
+    "BPS連続増加回数", "BPS減少期", "減配回数", "減配期", "無配転落期", "第2段階 不合格項目", "第2段階 未確認項目",
     "累進", "DOE", "DOE数値", "PBR1倍前後", "印", "注記", "エラー", "有報docID",
 ]
 
@@ -257,7 +264,7 @@ def to_csv_row(r: ScreenRow) -> dict:
     dates = lambda xs: " ".join(d.isoformat() for d in xs)  # noqa: E731
     return {
         "コード": r.company.sec_code,
-        "銘柄名": r.company.name,
+        "銘柄名": display_name(r.company.name),
         "業種": r.company.industry,
         "金融": "○" if r.financial else "",
         "判定": r.status,
@@ -269,6 +276,7 @@ def to_csv_row(r: ScreenRow) -> dict:
         "ROE": _f(s1.roe if s1 else None),
         "ROA": _f(s1.roa if s1 else None),
         "配当利回り(実績)": _f(s1.dividend_yield if s1 else None),
+        "1株配当(実績)": _f(s1.dps if s1 else None),
         "自己資本比率": _f(s1.equity_ratio if s1 else None, 1),
         "時価総額(億円)": _f(s1.market_cap / 1e8 if s1 and s1.market_cap else None, 0),
         "第1段階 不合格項目": " / ".join(s1.failures) if s1 else "",
@@ -283,6 +291,7 @@ def to_csv_row(r: ScreenRow) -> dict:
         "BPS伸び率": _f(s2.bps_growth if s2 else None),
         "BPS連続増加回数": s2.bps_streak if s2 else "",
         "BPS減少期": dates(s2.bps_decreases) if s2 else "",
+        "減配回数": len(s2.dividend_cuts) + len(s2.dividend_suspended) if s2 else "",
         "減配期": dates(s2.dividend_cuts) if s2 else "",
         "無配転落期": dates(s2.dividend_suspended) if s2 else "",
         "第2段階 不合格項目": " / ".join(s2.failures) if s2 else "",
@@ -346,12 +355,12 @@ def render_markdown(rows: list[ScreenRow], as_of: date, criteria: Criteria = Cri
         for r in rs:
             s1, s2 = r.stage1, r.stage2
             lines.append(
-                f"| {r.stage3.mark if r.stage3 else ''} | {r.company.name} | {r.company.sec_code} | {r.company.industry} | "
+                f"| {r.stage3.mark if r.stage3 else ''} | {display_name(r.company.name)} | {r.company.sec_code} | {r.company.industry} | "
                 f"{_f(s1.per)} | {_f(s1.pbr)} | {_f(s1.roe, 1)}% | "
                 f"{'—' if financial else _f(s1.roa, 1) + '%'} | {_f(s1.dividend_yield)}% | "
                 f"{'—' if financial else _f(s1.equity_ratio, 1) + '%'} | {_oku(s1.market_cap)} | "
                 f"{_f(s2.eps_first)}→{_f(s2.eps_last)}（{_f(s2.eps_ratio)}倍） | {_f(s2.bps_growth)}倍 | "
-                f"{s2.bps_streak}回 | {len(s2.dividend_cuts)}回 | {_policy(r.stage3)} | 要手動確認 | "
+                f"{s2.bps_streak}回（{s2.n_periods}期中） | {len(s2.dividend_cuts)}回 | {_policy(r.stage3)} | 要手動確認 | "
                 f"株価 {r.price.as_of if r.price else ''}／決算 {s2.first_end}〜{s2.last_end} |"
             )
         return lines
@@ -375,12 +384,12 @@ def render_markdown(rows: list[ScreenRow], as_of: date, criteria: Criteria = Cri
             detail.append("BPS減少 " + ", ".join(d.isoformat() for d in s2.bps_decreases))
         if s2.dividend_cuts:
             detail.append("減配 " + ", ".join(d.isoformat() for d in s2.dividend_cuts))
-        out.append(f"| {r.company.name} | {r.company.sec_code} | {r.company.industry} | "
+        out.append(f"| {display_name(r.company.name)} | {r.company.sec_code} | {r.company.industry} | "
                    f"{' / '.join(s2.failures)} | {'; '.join(detail)} |")
 
     out += ["", "## 第2段階 判定不能（データ不足）", "", "| 銘柄名 | コード | 理由 |", "|---|---|---|"]
     for r in sorted(by_status.get("第2段階 判定不能", []), key=lambda r: r.company.sec_code):
-        out.append(f"| {r.company.name} | {r.company.sec_code} | {' / '.join(r.stage2.missing) if r.stage2 else ''} |")
+        out.append(f"| {display_name(r.company.name)} | {r.company.sec_code} | {' / '.join(r.stage2.missing) if r.stage2 else ''} |")
 
     out += ["", "## 通過銘柄の業種分布", ""]
     counts: dict[str, int] = {}

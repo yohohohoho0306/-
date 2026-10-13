@@ -59,6 +59,7 @@ class Stage1:
     dividend_yield: Optional[float] = None
     equity_ratio: Optional[float] = None
     market_cap: Optional[float] = None
+    dps: Optional[float] = None  # 判定に使った 1 株配当（実績）
     financial: bool = False
     failures: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
@@ -76,7 +77,7 @@ def evaluate_stage1(
 ) -> Stage1:
     """直近期の実績と株価から第1段階を判定する（金融は ROA・自己資本比率を除外）."""
     s = Stage1(price=price, financial=financial, roe=latest.roe, roa=latest.roa,
-               equity_ratio=latest.equity_ratio)
+               equity_ratio=latest.equity_ratio, dps=latest.dps)
     if price is None or price <= 0:
         s.missing.append("株価")
     else:

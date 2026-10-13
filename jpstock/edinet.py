@@ -41,6 +41,13 @@ class EdinetError(RuntimeError):
     pass
 
 
+def _write_atomic(path: Path, data: bytes) -> None:
+    """途中まで書いたファイルを別プロセスが読まないよう、一時ファイルに書いてから置き換える."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+
+
 @dataclass
 class Company:
     edinet_code: str
@@ -143,7 +150,7 @@ class EdinetClient:
         ]
         # 当日・前日分は後から追加される可能性があるのでキャッシュしない
         if day < date.today() - timedelta(days=1):
-            path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+            _write_atomic(path, json.dumps(rows, ensure_ascii=False).encode("utf-8"))
             self._lists[day] = rows
         return rows
 
@@ -198,7 +205,7 @@ class EdinetClient:
             raise EdinetError(f"書類 {doc_id} の取得結果が ZIP ではありません: {resp.content[:200]!r}")
         facts, contexts = parse_instance(extract_instance(resp.content))
         data = facts_to_dict(facts, contexts)
-        path.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8")))
+        _write_atomic(path, gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8")))
         return build_report(*facts_from_dict(data), doc_id=doc_id)
 
 
