@@ -365,7 +365,17 @@ def build_report(
             for m in ("eps", "bps")
         )
         period = FiscalPeriod(end=end, start=start, nonconsolidated=has_consolidated and use_parent)
+        # 会計基準を移行した年は同じ期に複数の基準の値が載るので、EPS と同じ基準の要素を優先する
+        _, eps_element = _pick_named(facts, CONSOLIDATED_METRICS["eps"], idx, "Duration", use_parent)
+        standard = _standard_of(eps_element)
+        deferred_bps: list[str] = []
         for metric, names in CONSOLIDATED_METRICS.items():
+            if standard:
+                names = sorted(names, key=lambda n: _standard_of(n) != standard)
+            if metric == "bps" and standard:
+                # 別の基準の BPS は、同じ基準の持分から求められないときだけ使う（下の _fill_missing_bps の後）
+                deferred_bps = [n for n in names if _standard_of(n) != standard]
+                names = [n for n in names if _standard_of(n) == standard]
             if metric == "equity_ratio":
                 # 比率としてあり得ない値（1.5 超。1 株当たりの金額などの誤り）は飛ばして次の要素を見る
                 value = next((v for v in (_pick(facts, [n], idx, "Instant", use_parent) for n in names)
@@ -376,14 +386,21 @@ def build_report(
             if value is not None and metric in _RATIO_METRICS:
                 value *= 100.0  # EDINET の % 項目は 0.378 のような小数で入っている
             setattr(period, metric, value)
-            if metric == "eps" or (metric == "bps" and period.standard is None):
-                period.standard = _standard_of(element)
+        period.standard = standard
         for metric, names in PARENT_METRICS.items():
             value = _pick(facts, names, idx, _KIND[metric], nonconsolidated=True)
             if value is None:
                 value = _pick(facts, names, idx, _KIND[metric], nonconsolidated=False)
             setattr(period, metric, value)
         _fill_missing_bps(period, facts, idx, use_parent)
+        if period.bps is None and deferred_bps:
+            value, element = _pick_named(facts, deferred_bps, idx, "Instant", nonconsolidated=use_parent)
+            if value is not None:
+                period.bps = value
+                period.bps_source = f"EPS と別の会計基準（{_standard_of(element)}）の BPS"
+        if period.standard is None:
+            _, bps_element = _pick_named(facts, CONSOLIDATED_METRICS["bps"], idx, "Instant", use_parent)
+            period.standard = _standard_of(bps_element)
         report.periods.append(period)
 
     report.periods.sort(key=lambda p: p.end)

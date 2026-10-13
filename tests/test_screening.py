@@ -133,6 +133,13 @@ def test_ifrs_values_take_priority():
     assert report.latest.eps == 155.5
     assert report.periods[-2].eps == 130  # IFRS 値の無い期は日本基準の値
     assert [p.standard for p in report.periods][-2:] == ["JP", "IFRS"]
+    # IFRS の BPS が無い移行期は、IFRS の持分から求められなければ日本基準の BPS を注記付きで使う
+    assert report.latest.bps == 1400 and "別の会計基準（JP）" in report.latest.bps_source
+    owners = ('<jpcrp_cor:EquityAttributableToOwnersOfParentIFRSSummaryOfBusinessResults contextRef="CurrentYearInstant" '
+              'unitRef="u" decimals="-6">16000000000</jpcrp_cor:EquityAttributableToOwnersOfParentIFRSSummaryOfBusinessResults>')
+    ifrs = build_report(*parse_instance(make_instance(five_periods(), extra_facts=extra + owners)), doc_id="X")
+    # 持分 160 億円 ÷（純利益 1,000,000,004 円 ÷ EPS 155.5 円）≒ 2,488 円（同じ IFRS 基準の概算を優先）
+    assert ifrs.latest.bps == pytest.approx(16_000_000_000 / (1_000_000_004 / 155.5)) and "概算" in ifrs.latest.bps_source
     assert any("JP→IFRS" in n for n in merge_reports([report]).notes)
 
 
@@ -563,3 +570,12 @@ def test_adjust_ignores_split_already_in_period_end_shares():
     low = AnnualReport(doc_id="y", filing_date=date(2026, 6, 18),
                        periods=[fp(2026, 200, 2000, 60, 10_000_000, ni=0.8e9)])
     assert screen.adjust_for_later_splits(low, PriceInfo(1500, date(2026, 10, 9))) == (low, None)
+
+
+def test_rebase_history_puts_series_on_current_share_basis():
+    h = ten_years()
+    rebased = screen.rebase_history(h, after_filing=1.0, before_filing=2.0)  # イチケン型: 期末後・提出前の 1→2 分割
+    assert [p.dps for p in rebased.periods] == pytest.approx([p.dps / 2 for p in h.periods])
+    assert [p.eps for p in rebased.periods] == [p.eps for p in h.periods]
+    assert evaluate_stage2(rebased).dividend_cuts == evaluate_stage2(h).dividend_cuts
+    assert screen.rebase_history(h, 1.0, 1.0) is h

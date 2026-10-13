@@ -101,17 +101,18 @@ def _split_between_end_and_filing(latest, yahoo_factor: float) -> tuple[float, b
     return min(candidates, key=lambda r: abs(math.log(raw / r / 0.95))), False
 
 
-def adjust_for_later_splits(report: AnnualReport, price: Optional[PriceInfo]) -> tuple[AnnualReport, Optional[str]]:
-    """直近期の 1 株指標と株式数を、株価（現在の株数）の基準にそろえる.
+def later_split_factors(report: AnnualReport, price: Optional[PriceInfo]) -> tuple[float, float, bool]:
+    """有報の 1 株指標を現在の株数の基準にそろえる倍率.
 
-    - 提出日より後の分割: EPS・BPS・1 株配当・株式数のすべてに反映する。
-    - 決算期末〜提出日の分割: EPS・BPS は有報で反映済みなので、1 株配当と株式数だけに反映する。
+    戻り値は (提出日より後の分割の倍率, 決算期末〜提出日の分割の倍率, Yahoo の分割履歴と一致したか)。
+    - 提出日より後の分割: EPS・BPS・1 株配当・株式数のすべてに効く。
+    - 決算期末〜提出日の分割: EPS・BPS は有報で反映済みなので、1 株配当と株式数だけに効く。
       Yahoo の分割日は権利落ち日で、効力発生日（決算期末の翌日など）より数日早いので、
       期末の 7 日前から提出日までを候補とし、純利益 ÷ EPS との比で確かめる。
     """
     latest = report.latest
     if latest is None:
-        return report, None
+        return 1.0, 1.0, True
     filed = report.filing_date
     after_filing = price.split_factor_after(filed) if price and filed else 1.0
     if price and filed:
@@ -121,6 +122,15 @@ def adjust_for_later_splits(report: AnnualReport, price: Optional[PriceInfo]) ->
     else:
         window = 1.0
     before_filing, confirmed = _split_between_end_and_filing(latest, window)
+    return after_filing, before_filing, confirmed
+
+
+def adjust_for_later_splits(report: AnnualReport, price: Optional[PriceInfo]) -> tuple[AnnualReport, Optional[str]]:
+    """直近期の 1 株指標と株式数を、株価（現在の株数）の基準にそろえる（later_split_factors を参照）."""
+    latest = report.latest
+    if latest is None:
+        return report, None
+    after_filing, before_filing, confirmed = later_split_factors(report, price)
     if abs(after_filing - 1) < 1e-9 and abs(before_filing - 1) < 1e-9:
         return report, None
     adj = replace(latest)
@@ -140,6 +150,25 @@ def adjust_for_later_splits(report: AnnualReport, price: Optional[PriceInfo]) ->
         notes.append(f"有報提出後の株式分割（{after_filing:g}倍）を直近期の1株指標・株式数に反映")
     new_report = replace(report, periods=report.periods[:-1] + [adj])
     return new_report, " / ".join(notes)
+
+
+def rebase_history(history: History, after_filing: float, before_filing: float) -> History:
+    """10 期の系列を、直近期と同じく現在の株数の基準にそろえる（減配などの判定は変わらない）."""
+    if abs(after_filing - 1) < 1e-9 and abs(before_filing - 1) < 1e-9:
+        return history
+    periods = []
+    for p in history.periods:
+        q = replace(p)
+        for attr in ("eps", "bps"):
+            if getattr(q, attr) is not None:
+                setattr(q, attr, getattr(q, attr) / after_filing)
+        for attr in ("dps", "interim_dps"):
+            if getattr(q, attr) is not None:
+                setattr(q, attr, getattr(q, attr) / (after_filing * before_filing))
+        if q.shares:
+            q.shares *= after_filing * before_filing
+        periods.append(q)
+    return replace(history, periods=periods)
 
 
 def run_pipeline(
@@ -191,6 +220,9 @@ def run_pipeline(
         report, note = adjust_for_later_splits(report, row.price)
         if note:
             row.notes.append(note)
+        months = report.latest.months
+        if months is not None and months < 12:
+            row.notes.append(f"直近期は {months} か月の変則決算（EPS・ROE・ROA・配当は通期に換算していない）")
         row.stage1 = evaluate_stage1(
             report.latest, row.price.price if row.price else None, row.financial, criteria
         )
@@ -213,7 +245,7 @@ def run_pipeline(
             except (EdinetError, ValueError) as exc:
                 row.errors.append(f"{years}年前の有報取得失敗: {exc}")
         known = split_history.get(row.company.sec_code) or (row.price.splits if row.price else [])
-        row.history = merge_reports(reports, known)
+        row.history = rebase_history(merge_reports(reports, known), *later_split_factors(row.report, row.price)[:2])
         row.stage2 = evaluate_stage2(row.history, criteria)
         row.stage3 = evaluate_stage3(
             row.report.dividend_policy,
