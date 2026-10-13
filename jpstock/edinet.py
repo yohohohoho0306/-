@@ -21,7 +21,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
-from .xbrl import AnnualReport, report_from_zip
+from .xbrl import PARSER_VERSION, AnnualReport, report_from_zip
 
 API_BASE = "https://api.edinet-fsa.go.jp/api/v2"
 CODELIST_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/codelist/Edinetcode.zip"
@@ -76,6 +76,7 @@ class EdinetClient:
         self.session = session
         (self.cache_dir / "lists").mkdir(parents=True, exist_ok=True)
         (self.cache_dir / "reports").mkdir(parents=True, exist_ok=True)
+        self._lists: dict[date, list[dict]] = {}  # 第2段階で同じ日を何度も読むのでメモリにも置く
 
     # ---- HTTP -------------------------------------------------------------
 
@@ -119,9 +120,13 @@ class EdinetClient:
 
     def annual_reports_on(self, day: date) -> list[dict]:
         """その日に提出された有価証券報告書（取下げ分を除く）の一覧."""
+        if day in self._lists:
+            return self._lists[day]
         path = self.cache_dir / "lists" / f"{day.isoformat()}.json"
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            rows = json.loads(path.read_text(encoding="utf-8"))
+            self._lists[day] = rows
+            return rows
         resp = self._get(f"{API_BASE}/documents.json", {"date": day.isoformat(), "type": 2})
         data = resp.json()
         status = str((data.get("metadata") or {}).get("status") or data.get("StatusCode") or "")
@@ -136,6 +141,7 @@ class EdinetClient:
         # 当日・前日分は後から追加される可能性があるのでキャッシュしない
         if day < date.today() - timedelta(days=1):
             path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+            self._lists[day] = rows
         return rows
 
     def scan(self, start: date, end: date, progress: bool = False) -> Iterable[dict]:
@@ -176,13 +182,17 @@ class EdinetClient:
         """有価証券報告書の XBRL を取得して AnnualReport にする（結果をキャッシュ）."""
         path = self.cache_dir / "reports" / f"{doc_id}.json"
         if path.exists():
-            return AnnualReport.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            # 取り出し方を変えた後の古いキャッシュは使わずに取り直す
+            if cached.pop("parser_version", 1) == PARSER_VERSION:
+                return AnnualReport.from_dict(cached)
         resp = self._get(f"{API_BASE}/documents/{doc_id}", {"type": 1})
         if not resp.content.startswith(b"PK"):
             # エラー時は JSON（例: {"metadata": {"status": "404", ...}}）が返る
             raise EdinetError(f"書類 {doc_id} の取得結果が ZIP ではありません: {resp.content[:200]!r}")
         report = report_from_zip(resp.content, doc_id)
-        path.write_text(json.dumps(report.to_dict(), ensure_ascii=False), encoding="utf-8")
+        data = {"parser_version": PARSER_VERSION, **report.to_dict()}
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         return report
 
 

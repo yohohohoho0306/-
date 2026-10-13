@@ -15,6 +15,9 @@ from datetime import date
 from typing import Optional
 from xml.etree import ElementTree as ET
 
+# 取り出し方を変えたら上げる（古い版でキャッシュした指標は取り直す）
+PARSER_VERSION = 2
+
 _XBRLI = "{http://www.xbrl.org/2003/instance}"
 _XSI_NIL = "{http://www.w3.org/2001/XMLSchema-instance}nil"
 
@@ -65,7 +68,7 @@ PARENT_METRICS: dict[str, list[str]] = {
     "shares": ["TotalNumberOfIssuedSharesSummaryOfBusinessResults"],
 }
 
-# % 表示の指標（XBRL では 0.378 のような比率で格納される）
+# % 表示の指標（XBRL では 0.378 のような小数で格納されるので 100 倍する）
 _RATIO_METRICS = {"equity_ratio", "roe"}
 
 _DEI = {
@@ -99,6 +102,8 @@ class FiscalPeriod:
     equity_ratio: Optional[float] = None  # %
     roe: Optional[float] = None  # %
     shares: Optional[float] = None  # 期末発行済株式総数（提出会社）
+    nonconsolidated: bool = False  # 連結の報告書だが、この期は個別の値で補った
+    standard: Optional[str] = None  # EPS を取った要素の会計基準（JP / IFRS / US）
 
     @property
     def months(self) -> Optional[int]:
@@ -138,6 +143,7 @@ class AnnualReport:
     name: Optional[str] = None
     accounting_standard: Optional[str] = None
     consolidated: bool = True
+    filing_date: Optional[date] = None  # 提出日（XBRL の FilingDateInstant）
     dividend_policy: Optional[str] = None
     periods: list[FiscalPeriod] = field(default_factory=list)
 
@@ -148,12 +154,14 @@ class AnnualReport:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["periods"] = [p.to_dict() for p in self.periods]
+        d["filing_date"] = self.filing_date.isoformat() if self.filing_date else None
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "AnnualReport":
         d = dict(d)
         d["periods"] = [FiscalPeriod.from_dict(p) for p in d.get("periods", [])]
+        d["filing_date"] = date.fromisoformat(d["filing_date"]) if d.get("filing_date") else None
         return cls(**d)
 
 
@@ -243,14 +251,28 @@ def _periods_in(facts: dict[str, dict[str, str]]) -> set[int]:
     return idx
 
 
-def _pick(facts, names: list[str], idx: int, kind: str, nonconsolidated: bool) -> Optional[float]:
+def _pick_named(facts, names: list[str], idx: int, kind: str, nonconsolidated: bool) -> tuple[Optional[float], Optional[str]]:
     prefix = "CurrentYear" if idx == 0 else f"Prior{idx}Year"
     ctx = f"{prefix}{kind}" + ("_NonConsolidatedMember" if nonconsolidated else "")
     for name in names:
         value = _to_float(facts.get(name, {}).get(ctx))
         if value is not None:
-            return value
-    return None
+            return value, name
+    return None, None
+
+
+def _pick(facts, names: list[str], idx: int, kind: str, nonconsolidated: bool) -> Optional[float]:
+    return _pick_named(facts, names, idx, kind, nonconsolidated)[0]
+
+
+def _standard_of(element: Optional[str]) -> Optional[str]:
+    if element is None:
+        return None
+    if "IFRS" in element:
+        return "IFRS"
+    if "USGAAP" in element:
+        return "US"
+    return "JP"
 
 
 _KIND = {
@@ -282,6 +304,8 @@ def build_report(
         for ctx in facts.get(name, {})
     )
     report.consolidated = has_consolidated
+    filing = contexts.get("FilingDateInstant")
+    report.filing_date = filing[1] if filing else None
 
     for idx in sorted(_periods_in(facts), reverse=True):  # 古い期（Prior4）から
         prefix = "CurrentYear" if idx == 0 else f"Prior{idx}Year"
@@ -298,12 +322,19 @@ def build_report(
         if end is None:
             continue
 
-        period = FiscalPeriod(end=end, start=start)
+        # 連結決算を始める前の期などは連結の欄が空（nil）なので、その期だけ個別の値を使う
+        use_parent = not has_consolidated or all(
+            _pick(facts, CONSOLIDATED_METRICS[m], idx, _KIND[m], nonconsolidated=False) is None
+            for m in ("eps", "bps")
+        )
+        period = FiscalPeriod(end=end, start=start, nonconsolidated=has_consolidated and use_parent)
         for metric, names in CONSOLIDATED_METRICS.items():
-            value = _pick(facts, names, idx, _KIND[metric], nonconsolidated=not has_consolidated)
-            if value is not None and metric in _RATIO_METRICS and abs(value) <= 1.5:
-                value *= 100.0
+            value, element = _pick_named(facts, names, idx, _KIND[metric], nonconsolidated=use_parent)
+            if value is not None and metric in _RATIO_METRICS:
+                value *= 100.0  # EDINET の % 項目は 0.378 のような小数で入っている
             setattr(period, metric, value)
+            if metric == "eps" or (metric == "bps" and period.standard is None):
+                period.standard = _standard_of(element)
         for metric, names in PARENT_METRICS.items():
             value = _pick(facts, names, idx, _KIND[metric], nonconsolidated=True)
             if value is None:

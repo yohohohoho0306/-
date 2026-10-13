@@ -119,6 +119,12 @@ def merge_reports(reports: list[AnnualReport]) -> History:
     missing_shares = sum(1 for p in merged if not p.shares)
     if missing_shares:
         notes.append(f"発行済株式数が取れない期が {missing_shares} 期あり、分割の検出が不完全な可能性")
+    for prev, cur in zip(merged, merged[1:]):
+        if prev.standard and cur.standard and prev.standard != cur.standard:
+            notes.append(f"{cur.end} 期から会計基準が {prev.standard}→{cur.standard} に変わる（前後の EPS・BPS は基準が異なる）")
+    parent_only = [p.end for p in merged if p.nonconsolidated]
+    if parent_only:
+        notes.append(f"{parent_only[0]}〜{parent_only[-1]} 期の {len(parent_only)} 期は連結の値が無く、個別の値を使用")
     for p in merged:
         if p.months is not None and p.months < 12:
             notes.append(f"{p.end} 期は {p.months} か月の変則決算")

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
@@ -23,7 +24,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .edinet import Company, EdinetClient, EdinetError
-from .history import History, merge_reports
+from .history import SPLIT_RATIOS, History, merge_reports
 from .prices import PriceInfo, fetch_prices, load_prices_csv
 from .ricky import (
     Criteria, Stage1, Stage2, Stage3,
@@ -76,23 +77,69 @@ def years_before(day: date, years: int) -> date:
         return day.replace(year=day.year - years, day=28)
 
 
+def _split_between_end_and_filing(latest, yahoo_factor: float) -> tuple[float, bool]:
+    """決算期末〜提出日の分割の倍率を、純利益 ÷ EPS（期中平均株式数）と期末発行済株式総数の比から推定する.
+
+    有報の EPS・BPS は提出日までに効力が生じた分割を期首にさかのぼって反映するが、
+    期末発行済株式総数と 1 株配当は分割前のまま。自己株式や期中の増減で比は 0.5〜1.3 程度に
+    ばらつくので、その範囲なら分割なしとみなす。戻り値は (倍率, Yahoo の分割履歴と一致したか)。
+    """
+    if not (latest.net_income and latest.eps and latest.shares):
+        return 1.0, True
+    implied = latest.net_income / latest.eps
+    if implied <= 0:
+        return 1.0, True
+    raw = implied / latest.shares
+    if abs(yahoo_factor - 1) > 1e-9 and 0.5 < raw / yahoo_factor < 1.3:
+        return yahoo_factor, True
+    if raw < 1.3:
+        # 0.5 未満は期末直前の大量の新株発行などでも起こるので、Yahoo の裏付けが無ければ併合とみなさない
+        return 1.0, True
+    candidates = [r for r in SPLIT_RATIOS if r > 1 and 0.5 < raw / r < 1.3]
+    if not candidates:
+        return 1.0, True
+    return min(candidates, key=lambda r: abs(math.log(raw / r / 0.95))), False
+
+
 def adjust_for_later_splits(report: AnnualReport, price: Optional[PriceInfo]) -> tuple[AnnualReport, Optional[str]]:
-    """決算期末より後の株式分割を、直近期の 1 株指標と株式数に反映する."""
+    """直近期の 1 株指標と株式数を、株価（現在の株数）の基準にそろえる.
+
+    - 提出日より後の分割: EPS・BPS・1 株配当・株式数のすべてに反映する。
+    - 決算期末〜提出日の分割: EPS・BPS は有報で反映済みなので、1 株配当と株式数だけに反映する。
+      Yahoo の分割日は権利落ち日で、効力発生日（決算期末の翌日など）より数日早いので、
+      期末の 7 日前から提出日までを候補とし、純利益 ÷ EPS との比で確かめる。
+    """
     latest = report.latest
-    if latest is None or price is None:
+    if latest is None:
         return report, None
-    factor = price.split_factor_after(latest.end)
-    if abs(factor - 1) < 1e-9:
+    filed = report.filing_date
+    after_filing = price.split_factor_after(filed) if price and filed else 1.0
+    if price and filed:
+        window = price.split_factor_after(latest.end - timedelta(days=7)) / after_filing
+    elif price:  # 提出日が分からなければ期末以降の分割を候補にする
+        window = price.split_factor_after(latest.end - timedelta(days=7))
+    else:
+        window = 1.0
+    before_filing, confirmed = _split_between_end_and_filing(latest, window)
+    if abs(after_filing - 1) < 1e-9 and abs(before_filing - 1) < 1e-9:
         return report, None
     adj = replace(latest)
-    for attr in ("eps", "bps", "dps"):
-        value = getattr(adj, attr)
-        if value is not None:
-            setattr(adj, attr, value / factor)
+    if adj.eps is not None:
+        adj.eps /= after_filing
+    if adj.bps is not None:
+        adj.bps /= after_filing
+    if adj.dps is not None:
+        adj.dps /= after_filing * before_filing
     if adj.shares:
-        adj.shares *= factor
+        adj.shares *= after_filing * before_filing
+    notes = []
+    if abs(before_filing - 1) >= 1e-9:
+        notes.append(f"決算期末〜提出日の株式分割（{before_filing:g}倍）を直近期の1株配当・株式数に反映"
+                     + ("" if confirmed else "（Yahooの分割履歴と一致せず、要確認）"))
+    if abs(after_filing - 1) >= 1e-9:
+        notes.append(f"有報提出後の株式分割（{after_filing:g}倍）を直近期の1株指標・株式数に反映")
     new_report = replace(report, periods=report.periods[:-1] + [adj])
-    return new_report, f"決算期末後の株式分割（{factor:g}倍）を直近期の1株指標に反映"
+    return new_report, " / ".join(notes)
 
 
 def run_pipeline(

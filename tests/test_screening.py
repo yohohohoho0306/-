@@ -102,12 +102,37 @@ def test_build_report_nonconsolidated_only_company():
     assert report.latest.eps == 140 and report.latest.bps == 1400
 
 
+def test_build_report_uses_parent_values_before_consolidation_started():
+    # イチケン型: 連結決算は直近 2 期のみで、それより前の期は連結の欄が nil、個別の値だけがある
+    periods = five_periods()
+    xbrl = make_instance(periods)
+    for idx in (2, 3, 4):
+        for name, kind, value in (("BasicEarningsLossPerShareSummaryOfBusinessResults", "Duration", periods[4 - idx]["eps"]),
+                                  ("NetAssetsPerShareSummaryOfBusinessResults", "Instant", periods[4 - idx]["bps"]),
+                                  ("RateOfReturnOnEquitySummaryOfBusinessResults", "Duration", periods[4 - idx]["roe"])):
+            ctx = f"Prior{idx}Year{kind}"
+            xbrl = xbrl.replace(
+                f'<jpcrp_cor:{name} contextRef="{ctx}" unitRef="u" decimals="2">{value}</jpcrp_cor:{name}>'.encode(),
+                (f'<jpcrp_cor:{name} contextRef="{ctx}" unitRef="u" xsi:nil="true"/>'
+                 f'<jpcrp_cor:{name} contextRef="{ctx}_NonConsolidatedMember" unitRef="u" decimals="2">{value - 1}</jpcrp_cor:{name}>').encode(),
+            )
+    report = build_report(*parse_instance(xbrl), doc_id="X")
+    assert report.consolidated is True and report.filing_date == date(2026, 6, 20)
+    assert [p.nonconsolidated for p in report.periods] == [True, True, True, False, False]
+    assert [p.eps for p in report.periods] == [99, 109, 119, 130, 140]
+    assert [p.bps for p in report.periods][:3] == [999, 1099, 1199]
+    assert report.periods[0].roe == pytest.approx((0.0964 - 1) * 100)  # 個別の値（テスト用に 1 引いたもの）
+    assert any("個別の値" in n for n in merge_reports([report]).notes)
+
+
 def test_ifrs_values_take_priority():
     extra = ('<jpcrp_cor:BasicEarningsLossPerShareIFRSSummaryOfBusinessResults contextRef="CurrentYearDuration" '
              'unitRef="u" decimals="2">155.5</jpcrp_cor:BasicEarningsLossPerShareIFRSSummaryOfBusinessResults>')
     report = build_report(*parse_instance(make_instance(five_periods(), extra_facts=extra)), doc_id="X")
     assert report.latest.eps == 155.5
     assert report.periods[-2].eps == 130  # IFRS 値の無い期は日本基準の値
+    assert [p.standard for p in report.periods][-2:] == ["JP", "IFRS"]
+    assert any("JP→IFRS" in n for n in merge_reports([report]).notes)
 
 
 def test_extract_instance_prefers_public_doc_asr():
@@ -411,9 +436,40 @@ def test_run_pipeline_end_to_end(tmp_path):
     assert out.read_text(encoding="utf-8-sig").count("\n") == len(rows) + 1
 
 
-def test_adjust_for_later_splits():
-    report = AnnualReport(doc_id="x", periods=[fp(2026, 200, 2000, 60, 10_000_000)])
-    price = PriceInfo(1000, date(2026, 10, 9), splits=[(date(2026, 4, 1), 2.0)])
+def test_adjust_for_splits_after_filing():
+    # 有報提出（6/20）より後の分割は EPS・BPS・配当・株式数のすべてに反映
+    report = AnnualReport(doc_id="x", filing_date=date(2026, 6, 20),
+                          periods=[fp(2026, 200, 2000, 60, 10_000_000, ni=2e9)])
+    price = PriceInfo(1000, date(2026, 10, 9), splits=[(date(2026, 9, 29), 2.0)])
     adjusted, note = screen.adjust_for_later_splits(report, price)
-    assert adjusted.latest.eps == 100 and adjusted.latest.dps == 30 and adjusted.latest.shares == 20_000_000
-    assert note and report.latest.eps == 200  # 元の報告書は変えない
+    assert adjusted.latest.eps == 100 and adjusted.latest.bps == 1000
+    assert adjusted.latest.dps == 30 and adjusted.latest.shares == 20_000_000
+    assert "提出後" in note and report.latest.eps == 200  # 元の報告書は変えない
+
+
+def test_adjust_for_split_between_period_end_and_filing():
+    # イチケン型: 4/1 効力発生の分割（Yahoo の権利落ち日は 3/30）。有報の EPS・BPS は分割後の基準、
+    # 期末発行済株式数と 1 株配当は分割前のまま（純利益 ÷ EPS が発行済株式数の 2 倍）
+    report = AnnualReport(doc_id="x", filing_date=date(2026, 6, 18),
+                          periods=[fp(2026, 200, 2000, 60, 10_000_000, ni=4e9)])
+    price = PriceInfo(1500, date(2026, 10, 9), splits=[(date(2026, 3, 30), 2.0)])
+    adjusted, note = screen.adjust_for_later_splits(report, price)
+    assert adjusted.latest.eps == 200 and adjusted.latest.bps == 2000
+    assert adjusted.latest.dps == 30 and adjusted.latest.shares == 20_000_000
+    assert "決算期末〜提出日" in note and "要確認" not in note
+
+    # Yahoo に分割履歴が無くても、比が 2 倍なら反映して要確認の注記を付ける
+    adjusted, note = screen.adjust_for_later_splits(report, PriceInfo(1500, date(2026, 10, 9)))
+    assert adjusted.latest.dps == 30 and "要確認" in note
+
+
+def test_adjust_ignores_split_already_in_period_end_shares():
+    # 権利落ちが期末の数日前でも、期末までに効力が生じていれば株式数は分割後（比は 1 倍前後）
+    report = AnnualReport(doc_id="x", filing_date=date(2026, 6, 18),
+                          periods=[fp(2026, 200, 2000, 60, 10_000_000, ni=1.9e9)])
+    price = PriceInfo(1500, date(2026, 10, 9), splits=[(date(2026, 3, 26), 2.0)])
+    assert screen.adjust_for_later_splits(report, price) == (report, None)
+    # 比が 0.5 未満（期末直前の増資など）でも、Yahoo の裏付けが無ければ併合とはみなさない
+    low = AnnualReport(doc_id="y", filing_date=date(2026, 6, 18),
+                       periods=[fp(2026, 200, 2000, 60, 10_000_000, ni=0.8e9)])
+    assert screen.adjust_for_later_splits(low, PriceInfo(1500, date(2026, 10, 9))) == (low, None)
