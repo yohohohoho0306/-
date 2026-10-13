@@ -127,10 +127,17 @@ def _match_known_split(ratio: Optional[float], known: list[tuple[date, float]], 
         r = 1.0
         for _, _, x in group:
             r *= x
-        if ratio is None or 0.75 <= ratio / r <= 1.33:
+        # 株式数の比が分割の倍率から ±25〜33% 以内で、しかも 1 倍より分割の倍率に近いこと
+        # （1.1 倍の分割を、株式数が変わらない期に当てはめない）
+        if ratio is None or (0.75 <= ratio / r <= 1.33 and _closer_to_split(ratio, r)):
             used.update(k for k, _, _ in group)
             return r, group[-1][1]
     return None, None
+
+
+def _closer_to_split(observed: float, split: float) -> bool:
+    """観測した比が、1 倍（変化なし）よりも分割の倍率に（対数で）近いか."""
+    return observed > 0 and abs(math.log(observed / split)) < abs(math.log(observed))
 
 
 def _score(values: list[Optional[float]]) -> float:
@@ -263,7 +270,10 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
         # 株式数が変わった期から 2 期前までの境目を探す
         for j in range(i, max(i - 3, 0), -1):
             a, b = merged[j - 1], merged[j]
-            if a.bps and b.bps and split / 1.35 <= a.bps / b.bps <= split * 1.35:
+            observed = a.bps / b.bps if a.bps and b.bps else None
+            # 倍率から ±35% 以内で、変化なし（1 倍）との距離の半分より倍率に近いこと（小さな分割で普通の増減を拾わない）
+            if observed and split / 1.35 <= observed <= split * 1.35 \
+                    and abs(math.log(observed / split)) < 0.5 * abs(math.log(split)):
                 notes.append(f"{b.end} 期より前の EPS・BPS が分割未修正とみられるため割り戻した")
                 for k in range(j):
                     if merged[k].eps is not None:

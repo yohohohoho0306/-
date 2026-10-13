@@ -697,3 +697,19 @@ def test_run_pipeline_skips_annual_report_without_summary_table():
     rows = screen.run_pipeline(CandidateClient(companies, reports), lambda codes: prices, as_of=date(2026, 10, 12),
                                log=lambda m: None)
     assert rows[0].status == "通過" and any("主要な経営指標が無い" in n for n in rows[0].notes)
+
+
+def test_small_split_is_not_matched_to_unchanged_share_count_or_normal_bps_growth():
+    # 橋本総業型: Yahoo に 1.1 倍の分割があっても、株式数が変わらない期には当てはめない
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2017, 50, 1000, 20, 10_000_000), fp(2018, 55, 1050, 22, 10_000_000), fp(2019, 60, 1100, 24, 10_000_000),
+    ])
+    h = merge_reports([report], known_splits=[(date(2018, 3, 28), 1.1)])
+    assert h.splits == [] and [p.dps for p in h.periods] == [20, 22, 24]
+    # タクミナ型: 1.2 倍の分割（株式数も 1.2 倍）で、前の期の BPS が普通に増えているだけなら割り戻さない
+    report2 = AnnualReport(doc_id="r", periods=[
+        fp(2017, 50, 1000, 20, 10_000_000), fp(2018, 46, 1040, 18, 12_000_000), fp(2019, 50, 1090, 19, 12_000_000),
+    ])
+    h2 = merge_reports([report2], known_splits=[(date(2017, 9, 27), 1.2)])
+    assert h2.splits == [(date(2018, 3, 31), 1.2)]
+    assert [p.bps for p in h2.periods] == [1000, 1040, 1090] and not any("未修正" in n for n in h2.notes)
