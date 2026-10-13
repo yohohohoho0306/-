@@ -469,8 +469,9 @@ def main(argv: list[str] | None = None) -> int:
         price_source = lambda codes: {c: table[c] for c in codes if c in table}  # noqa: E731
         split_source = None
     else:
-        price_source = fetch_prices
-        split_source = fetch_split_history
+        price_cache = Path(args.cache_dir).parent / "prices"
+        price_source = lambda codes: fetch_prices(codes, cache_dir=price_cache)  # noqa: E731
+        split_source = lambda codes: fetch_split_history(codes, cache_dir=price_cache)  # noqa: E731
 
     try:
         rows = run_pipeline(client, price_source, as_of, codes=args.codes,

@@ -444,6 +444,56 @@ def test_parse_download_frame_reads_close_and_splits():
     assert "9999" not in prices
 
 
+class FakeYF:
+    """yfinance の代わり。最初の呼び出しはアクセス制限で全滅し、2 回目から値を返す."""
+
+    def __init__(self):
+        self.calls = []
+        self.shared = type("S", (), {"_ERRORS": {}})()
+
+    def download(self, tickers, **kw):
+        self.calls.append(list(tickers))
+        if len(self.calls) == 1:
+            self.shared._ERRORS = {t: "YFRateLimitError('Too Many Requests. Rate limited.')" for t in tickers}
+            return pd.DataFrame()
+        self.shared._ERRORS = {}
+        idx = pd.to_datetime(["2026-10-08", "2026-10-09"])
+        cols = pd.MultiIndex.from_product([tickers, ["Close", "Stock Splits"]])
+        return pd.DataFrame([[1000, 0] * len(tickers), [1010, 0] * len(tickers)], index=idx, columns=cols)
+
+
+def test_fetch_prices_retries_rate_limit_and_caches(tmp_path, monkeypatch):
+    fake = FakeYF()
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    from jpstock.prices import fetch_prices
+    waits = []
+    prices = fetch_prices(["7203", "9882"], cache_dir=tmp_path, log=lambda m: None, sleep=waits.append)
+    assert prices["7203"].price == 1010 and prices["9882"].as_of == date(2026, 10, 9)
+    assert len(fake.calls) == 2 and 30 in waits
+    again = fetch_prices(["7203", "9882"], cache_dir=tmp_path, log=lambda m: None, sleep=waits.append)
+    assert len(fake.calls) == 2 and again["7203"].price == 1010  # 同じ日の 2 回目はキャッシュ
+
+
+class LoggingFakeYF(FakeYF):
+    """yfinance 1.x 型: エラーは shared に残らずログに出るだけ."""
+
+    def download(self, tickers, **kw):
+        import logging
+        df = super().download(tickers, **kw)
+        if self.shared._ERRORS:
+            logging.getLogger("yfinance").error(f"{list(tickers)}: YFRateLimitError('Too Many Requests. Rate limited.')")
+            self.shared._ERRORS = {}
+        return df
+
+
+def test_fetch_prices_detects_rate_limit_from_log(tmp_path, monkeypatch):
+    fake = LoggingFakeYF()
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    from jpstock.prices import fetch_prices
+    prices = fetch_prices(["7203"], log=lambda m: None, sleep=lambda s: None)
+    assert prices["7203"].price == 1010 and len(fake.calls) == 2
+
+
 def test_load_prices_csv(tmp_path):
     path = tmp_path / "p.csv"
     path.write_text("code,price,date\n7203,\"3,061\",2026-10-09\n1911.T,1190,2026-10-08\nbad,x,2026-10-08\n", encoding="utf-8")
