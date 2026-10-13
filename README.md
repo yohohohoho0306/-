@@ -129,6 +129,11 @@ python -m jpstock.screen                     # 全上場会社（初回は数時
 キャッシュ（`.cache/edinet`）には書類一覧と、有報 XBRL のうち「主要な経営指標等の推移」・DEI・配当政策の要素の値だけを
 gzip で保存する。取り出し方を直しても書類を取り直さずに計算し直せる。
 
+調査の結果と次回の続け方は `research/` にまとめてある（Obsidian ではこのリポジトリのフォルダを保管庫として開く）。
+
+- [調査ノートの入口](research/INDEX.md): 最新のレポート、銘柄ごとのノート、次回の進め方、費用と時間の目安
+- [tools/ricky_report の道具](tools/ricky_report/README.md): 全社の判定・前回との差分・確認の入力づくり・レポートとノートの作成
+
 ## 開発 / テスト
 
 ロジック部分（コード正規化・指標整形・各種フォーマット）はネットワーク不要のユニットテストで検証できます。
@@ -157,6 +162,8 @@ jpstock/
 tests/
   test_jpstock.py
   test_screening.py
+tools/ricky_report/  # 全社の判定・確認・レポートとノートの作成（README あり）
+research/            # 調査の記録（Obsidian の保管庫としても開ける。入口は research/INDEX.md）
 ```
 
 ## 注意事項
