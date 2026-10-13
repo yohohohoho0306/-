@@ -713,3 +713,19 @@ def test_small_split_is_not_matched_to_unchanged_share_count_or_normal_bps_growt
     h2 = merge_reports([report2], known_splits=[(date(2017, 9, 27), 1.2)])
     assert h2.splits == [(date(2018, 3, 31), 1.2)]
     assert [p.bps for p in h2.periods] == [1000, 1040, 1090] and not any("未修正" in n for n in h2.notes)
+
+
+def test_blank_dividend_is_treated_as_no_dividend_when_other_periods_have_one():
+    # 石原産業型: 2 期は無配（欄が「－」）、その後に復配
+    xbrl = make_instance(five_periods())
+    for ctx in ("Prior4YearDuration_NonConsolidatedMember", "Prior3YearDuration_NonConsolidatedMember"):
+        value = {"Prior4YearDuration_NonConsolidatedMember": 30, "Prior3YearDuration_NonConsolidatedMember": 31}[ctx]
+        xbrl = xbrl.replace(
+            f'<jpcrp_cor:DividendPaidPerShareSummaryOfBusinessResults contextRef="{ctx}" unitRef="u" decimals="2">{value}</jpcrp_cor:DividendPaidPerShareSummaryOfBusinessResults>'.encode(),
+            f'<jpcrp_cor:DividendPaidPerShareSummaryOfBusinessResults contextRef="{ctx}" unitRef="u" xsi:nil="true"/>'.encode())
+    report = build_report(*parse_instance(xbrl), doc_id="X")
+    assert [p.dps for p in report.periods] == [0, 0, 32, 33, 34]
+    h = merge_reports([report])
+    assert any("無配とみなした" in n for n in h.notes)
+    s2 = evaluate_stage2(h)
+    assert s2.dividend_cuts == [] and s2.dividend_suspended == [] and "1株配当欠損" not in s2.missing

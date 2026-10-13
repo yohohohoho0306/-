@@ -112,6 +112,7 @@ class FiscalPeriod:
     interim_dps: Optional[float] = None  # 1 株配当のうち中間配当
     owners_equity: Optional[float] = None  # 親会社の所有者に帰属する持分（IFRS。BPS が無いときに使う）
     bps_source: Optional[str] = None  # BPS を表から直接取れなかったときの取り方
+    dps_assumed_zero: bool = False  # 1 株配当の欄が空（「－」）なので無配とみなした
     nonconsolidated: bool = False  # 連結の報告書だが、この期は個別の値で補った
     standard: Optional[str] = None  # EPS を取った要素の会計基準（JP / IFRS / US）
 
@@ -409,6 +410,11 @@ def build_report(
         report.periods.append(period)
 
     report.periods.sort(key=lambda p: p.end)
+    # 無配の期は 1 株配当の欄が「－」（XBRL では nil）になる。同じ報告書の他の期に配当があれば無配とみなす
+    if any(p.dps is not None for p in report.periods):
+        for p in report.periods:
+            if p.dps is None:
+                p.dps, p.dps_assumed_zero = 0.0, True
     return report
 
 

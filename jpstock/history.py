@@ -289,6 +289,9 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
     for prev, cur in zip(merged, merged[1:]):
         if prev.standard and cur.standard and prev.standard != cur.standard:
             notes.append(f"{cur.end} 期から会計基準が {prev.standard}→{cur.standard} に変わる（前後の EPS・BPS は基準が異なる）")
+    no_div = [p.end for p in merged if p.dps_assumed_zero]
+    if no_div:
+        notes.append("1株配当の欄が空の期（" + ", ".join(str(d) for d in no_div) + "）は無配とみなした")
     estimated = [p for p in merged if p.bps_source]
     if estimated:
         sources = "・".join(dict.fromkeys(p.bps_source for p in estimated))
