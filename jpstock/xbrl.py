@@ -67,9 +67,12 @@ CONSOLIDATED_METRICS: dict[str, list[str]] = {
 
 # 提出会社（個別）の表に載る指標。個別コンテキストを優先して探す。
 PARENT_METRICS: dict[str, list[str]] = {
-    "dps": ["DividendPaidPerShareSummaryOfBusinessResults"],
-    "interim_dps": ["InterimDividendPaidPerShareSummaryOfBusinessResults"],
-    "shares": ["TotalNumberOfIssuedSharesSummaryOfBusinessResults"],
+    # 種類株式のある会社（東京製綱など）は普通株式の要素で載せる
+    "dps": ["DividendPaidPerShareSummaryOfBusinessResults", "DividendPaidPerShareCommonStockSummaryOfBusinessResults"],
+    "interim_dps": ["InterimDividendPaidPerShareSummaryOfBusinessResults",
+                    "InterimDividendPaidPerShareCommonStockSummaryOfBusinessResults"],
+    "shares": ["TotalNumberOfIssuedSharesSummaryOfBusinessResults",
+               "CommonStocksTotalNumberOfIssuedSharesSummaryOfBusinessResults"],
 }
 
 # % 表示の指標（XBRL では 0.378 のような小数で格納されるので 100 倍する）
@@ -299,23 +302,25 @@ _KIND = {
 
 
 def _fill_missing_bps(period: FiscalPeriod, facts, idx: int, nonconsolidated: bool) -> None:
-    """BPS が表に無い期は、親会社所有者帰属持分 ÷（純利益 ÷ EPS）で概算する.
+    """BPS が BPS の要素に無い期を補う.
 
-    比率の要素に 1 株当たりの金額が誤って入っていることがある（トヨタの EquityToAssetRatioIFRS など）。
-    比率としてあり得ない値（1.5 超）が概算値と 5% 以内で一致すれば、それを BPS とみなす。
+    IFRS の会社の多く（トヨタ・日本航空・カヤバなど）は、1 株当たり親会社所有者帰属持分を
+    EquityToAssetRatioIFRS という比率のような名前の要素で載せている。比率としてあり得ない値（1.5 超）
+    なら BPS とみなす（親会社所有者帰属持分 ÷（純利益 ÷ EPS）の概算と 0.5〜2 倍の範囲で確かめる）。
+    それも無ければ概算を使う。概算は期中に株式数が大きく変わった年は 10% ほどずれる。
     """
-    if period.bps is not None or not period.owners_equity or not period.eps or not period.net_income:
+    if period.bps is not None:
         return
-    implied_shares = period.net_income / period.eps
-    if implied_shares <= 0:
-        return
-    estimate = period.owners_equity / implied_shares
+    estimate = None
+    if period.owners_equity and period.eps and period.net_income and period.net_income / period.eps > 0:
+        estimate = period.owners_equity / (period.net_income / period.eps)
     for name in CONSOLIDATED_METRICS["equity_ratio"]:
         value = _pick(facts, [name], idx, "Instant", nonconsolidated)
-        if value is not None and value > 1.5 and abs(value / estimate - 1) <= 0.05:
-            period.bps, period.bps_source = value, f"比率の要素（{name}）に入っていた値"
+        if value is not None and value > 1.5 and (estimate is None or 0.5 <= value / estimate <= 2):
+            period.bps, period.bps_source = value, f"{name.replace('SummaryOfBusinessResults', '')} の要素の値"
             return
-    period.bps, period.bps_source = estimate, "親会社所有者帰属持分÷(純利益÷EPS)の概算"
+    if estimate is not None:
+        period.bps, period.bps_source = estimate, "親会社所有者帰属持分÷(純利益÷EPS)の概算"
 
 
 def build_report(

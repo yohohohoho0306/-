@@ -144,7 +144,7 @@ def test_ifrs_values_take_priority():
 
 
 def test_bps_from_mistagged_ratio_element_or_estimate():
-    # トヨタ型: IFRS の BPS 要素が無く、自己資本比率の要素（EquityToAssetRatioIFRS）に BPS が入っている
+    # IFRS の会社の多く（トヨタなど）: BPS の要素が無く、EquityToAssetRatioIFRS の要素に BPS が入っている
     periods = five_periods()
     xbrl = make_instance(periods)
     for i, p in enumerate(periods):
@@ -165,7 +165,7 @@ def test_bps_from_mistagged_ratio_element_or_estimate():
     mistag = ('<jpcrp_cor:EquityToAssetRatioIFRSSummaryOfBusinessResults contextRef="CurrentYearInstant" '
               'unitRef="u" decimals="2">1412.5</jpcrp_cor:EquityToAssetRatioIFRSSummaryOfBusinessResults>')
     report = build_report(*parse_instance(xbrl.replace(b"</xbrli:xbrl>", (extra + mistag).encode() + b"</xbrli:xbrl>")), doc_id="X")
-    assert report.latest.bps == 1412.5 and "比率の要素" in report.latest.bps_source
+    assert report.latest.bps == 1412.5 and "EquityToAssetRatioIFRS の要素" in report.latest.bps_source
     assert report.latest.equity_ratio == pytest.approx(45.2)  # 1.5 超の値は自己資本比率として使わない
 
 
@@ -220,6 +220,35 @@ def test_merge_fixes_unadjusted_eps_bps_inside_one_report():
     assert [p.bps for p in h.periods] == pytest.approx([500, 540, 590, 640, 700])
     assert [p.eps for p in h.periods][:2] == pytest.approx([50, 55])
     assert any("未修正" in n for n in h.notes)
+
+
+def test_merge_fixes_eps_bps_restated_only_for_current_and_prior_year():
+    # フィード・ワン型: 5→1 の併合（2021/3 期）。有報は当期と前期（2020/3 期）だけを併合後の基準に直し、
+    # それより前の期は併合前のまま。株式数が変わる期の 1 期前の境目で BPS が 5 倍に飛ぶ
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2017, 20, 155, 4.5, 197_000_000), fp(2018, 15, 167, 4.5, 197_000_000), fp(2019, 24, 183, 4.5, 197_000_000),
+        fp(2020, 98, 978, 5.0, 197_000_000), fp(2021, 113, 1075, 15.0, 39_400_000),
+    ])
+    h = merge_reports([report], known_splits=[(date(2020, 9, 29), 0.2)])
+    assert [p.bps for p in h.periods] == pytest.approx([775, 835, 915, 978, 1075])
+    assert [p.eps for p in h.periods][:3] == pytest.approx([100, 75, 120])
+    assert any("2020-03-31 期より前" in n for n in h.notes)
+
+
+def test_merge_aligns_report_across_two_splits_and_retroactive_restatement():
+    # 川田テクノロジーズ型: 古い報告書の後に 1→3 の分割が 2 回（係数 1/9）
+    newer = AnnualReport(doc_id="new", periods=[fp(2022 + k, 100 + k, 1300 + 100 * k, 30, 17_000_000) for k in range(5)])
+    older = AnnualReport(doc_id="old", periods=[fp(2018 + k, 900 + k, 9000 + 900 * k, 30, 1_900_000) for k in range(5)])
+    older.periods[-1].bps, older.periods[-1].eps = 1300 * 9, 100 * 9
+    h = merge_reports([newer, older])
+    assert h.periods[0].bps == pytest.approx(1000) and any("係数 0.111111" in n for n in h.notes)
+    # 三協フロンテア型: 重複期の BPS が遡及修正で 12% ずれる。EPS の比（0.5）で換算し、注記する
+    newer2 = AnnualReport(doc_id="new", periods=[fp(2022 + k, 286 + k, 1738 + 100 * k, 80, 23_000_000) for k in range(5)])
+    older2 = AnnualReport(doc_id="old", periods=[fp(2018 + k, 500 + k, 3000 + 200 * k, 160, 11_500_000) for k in range(5)])
+    older2.periods[-1].bps, older2.periods[-1].eps = 3937.5, 572
+    h2 = merge_reports([newer2, older2])
+    assert h2.periods[0].bps == pytest.approx(1500)
+    assert any("係数 0.5" in n for n in h2.notes) and any("遡って修正" in n for n in h2.notes)
 
 
 def test_merge_keeps_dividends_already_restated_for_split():
@@ -494,6 +523,29 @@ def test_fetch_prices_detects_rate_limit_from_log(tmp_path, monkeypatch):
     assert prices["7203"].price == 1010 and len(fake.calls) == 2
 
 
+class RegionalFakeYF(FakeYF):
+    """東証（.T）では見つからず、札証（.S）にだけある銘柄."""
+
+    def download(self, tickers, **kw):
+        self.calls.append(list(tickers))
+        self.shared._ERRORS = {}
+        found = [t for t in tickers if t.endswith(".S")]
+        if not found:
+            return pd.DataFrame()
+        idx = pd.to_datetime(["2026-10-09"])
+        cols = pd.MultiIndex.from_product([found, ["Close", "Stock Splits"]])
+        return pd.DataFrame([[1394, 0] * len(found)], index=idx, columns=cols)
+
+
+def test_fetch_prices_falls_back_to_regional_exchanges(monkeypatch):
+    fake = RegionalFakeYF()
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    from jpstock.prices import fetch_prices
+    prices = fetch_prices(["1832"], log=lambda m: None, sleep=lambda s: None)
+    assert prices["1832"].price == 1394 and prices["1832"].symbol == "1832.S"
+    assert fake.calls == [["1832.T"], ["1832.S"]]
+
+
 def test_load_prices_csv(tmp_path):
     path = tmp_path / "p.csv"
     path.write_text("code,price,date\n7203,\"3,061\",2026-10-09\n1911.T,1190,2026-10-08\nbad,x,2026-10-08\n", encoding="utf-8")
@@ -629,3 +681,19 @@ def test_rebase_history_puts_series_on_current_share_basis():
     assert [p.eps for p in rebased.periods] == [p.eps for p in h.periods]
     assert evaluate_stage2(rebased).dividend_cuts == evaluate_stage2(h).dividend_cuts
     assert screen.rebase_history(h, 1.0, 1.0) is h
+
+
+def test_run_pipeline_skips_annual_report_without_summary_table():
+    # クレディセゾン型: いちばん新しい有報（別の有報）に主要な経営指標が無い → 次の候補を使う
+    companies = [make_company("E1", "1111")]
+    reports = full_set("1111", "E1")
+    reports[("E1", 9999)] = AnnualReport(doc_id="other", periods=[])
+
+    class CandidateClient(FakeClient):
+        def annual_report_candidates(self, start, end):
+            return {"E1": [{"docID": "E1:9999"}, {"docID": "E1:2026"}]}
+
+    prices = {"1111": PriceInfo(1900, date(2026, 10, 9))}
+    rows = screen.run_pipeline(CandidateClient(companies, reports), lambda codes: prices, as_of=date(2026, 10, 12),
+                               log=lambda m: None)
+    assert rows[0].status == "通過" and any("主要な経営指標が無い" in n for n in rows[0].notes)

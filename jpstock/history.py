@@ -21,6 +21,9 @@ from .xbrl import AnnualReport, FiscalPeriod
 
 _BASE_RATIOS = [1.5, 2, 3, 4, 5, 10, 20, 50, 100]
 SPLIT_RATIOS = sorted(set(_BASE_RATIOS + [1 / r for r in _BASE_RATIOS]))
+# 報告書をまたぐと分割が 2 回重なることがある（川田テクノロジーズ: 1→3 を 2 回で 9 倍）
+_COMBINED = {a * b for a in _BASE_RATIOS for b in _BASE_RATIOS if a * b <= 1000} | set(_BASE_RATIOS)
+COMBINED_RATIOS = sorted(_COMBINED | {1 / r for r in _COMBINED})
 
 
 @dataclass
@@ -32,40 +35,55 @@ class History:
     notes: list[str] = field(default_factory=list)
 
 
-def nearest_split_ratio(ratio: float, tol: float = 0.03) -> Optional[float]:
-    """株式数の比が分割・併合の倍率（2倍, 1/5 など）に近ければその倍率を返す."""
-    for candidate in SPLIT_RATIOS:
-        if abs(ratio / candidate - 1) <= tol:
-            return candidate
-    return None
+def nearest_split_ratio(ratio: float, tol: float = 0.03, candidates: list[float] = SPLIT_RATIOS) -> Optional[float]:
+    """株式数の比が分割・併合の倍率（2倍, 1/5 など）に近ければ、いちばん近い倍率を返す."""
+    best = min(candidates, key=lambda c: abs(ratio / c - 1))
+    return best if abs(ratio / best - 1) <= tol else None
 
 
 def _same_period(a: date, b: date, tol_days: int = 20) -> bool:
     return abs((a - b).days) <= tol_days
 
 
-def _basis_factor(newer: list[FiscalPeriod], older: AnnualReport, notes: list[str]) -> float:
-    """古い報告書の EPS/BPS を新しい基準に合わせる係数を、重複する期から求める."""
+def _basis_factor(newer: list[FiscalPeriod], older: AnnualReport, notes: list[str],
+                  expected: Optional[float] = None) -> float:
+    """古い報告書の EPS/BPS を新しい基準に合わせる係数を、重複する期から求める.
+
+    expected は Yahoo の分割履歴から見込んだ係数（古い報告書の期末〜新しい報告書の提出日の分割）。
+    比がそれに近ければそれを使う。無ければ BPS・EPS の比を 1 回分の分割の倍率に、次に 2 回分を
+    重ねた倍率（川田テクノロジーズの 1/9 など）に丸める。新しい報告書が会計方針の変更などで重複期を
+    遡って修正していると BPS の比が分割の倍率からずれる（三協フロンテア）ので、そのときは注記する。
+    """
     pairs = [
         (n, o) for o in older.periods for n in newer if _same_period(n.end, o.end)
     ]
     if not pairs:
         notes.append(f"報告書 {older.doc_id} と重複する期がなく、1株指標の基準合わせができない（要確認）")
         return 1.0
-    ratios = [n.bps / o.bps for n, o in pairs if n.bps and o.bps]
-    if not ratios:
-        ratios = [n.eps / o.eps for n, o in pairs if n.eps and o.eps and (n.eps > 0) == (o.eps > 0)]
-    if not ratios:
+    bps = [n.bps / o.bps for n, o in pairs if n.bps and o.bps]
+    eps = [n.eps / o.eps for n, o in pairs if n.eps and o.eps and (n.eps > 0) == (o.eps > 0)]
+    raws = [median(v) for v in (bps, eps) if v]
+    if not raws:
         return 1.0
-    factor = median(ratios)
-    if abs(factor - 1) <= 0.03:
+    factor = None
+    if any(abs(r - 1) <= 0.03 for r in raws):
+        factor = 1.0
+    elif expected is not None and any(abs(r / expected - 1) <= 0.15 for r in raws):
+        factor = expected
+    else:
+        for candidates in (SPLIT_RATIOS, COMBINED_RATIOS):
+            factor = next((f for f in (nearest_split_ratio(r, 0.05, candidates) for r in raws) if f), None)
+            if factor is not None:
+                break
+    if factor is None:
+        notes.append(f"報告書 {older.doc_id} と重複期の BPS/EPS が一致しない（比 {raws[0]:.3f}、要確認）")
         return 1.0
-    split = nearest_split_ratio(factor, tol=0.05)
-    if split is not None:
-        notes.append(f"報告書 {older.doc_id} の EPS・BPS を係数 {split:g} で新しい基準に換算（分割・併合）")
-        return split
-    notes.append(f"報告書 {older.doc_id} と重複期の BPS/EPS が一致しない（比 {factor:.3f}、要確認）")
-    return 1.0
+    if factor != 1.0:
+        notes.append(f"報告書 {older.doc_id} の EPS・BPS を係数 {factor:g} で新しい基準に換算（分割・併合）")
+    if bps and abs(median(bps) / factor - 1) > 0.03:
+        notes.append(f"報告書 {older.doc_id} と重複期の BPS が {median(bps) / factor - 1:+.1%} ずれる"
+                     "（新しい報告書で遡って修正された可能性。つなぎ目の BPS 増減は要確認）")
+    return factor
 
 
 def _dividend_factor(newer: list[FiscalPeriod], older: AnnualReport, notes: list[str]) -> float:
@@ -81,7 +99,7 @@ def _dividend_factor(newer: list[FiscalPeriod], older: AnnualReport, notes: list
     factor = median(ratios)
     if abs(factor - 1) <= 0.03:
         return 1.0
-    split = nearest_split_ratio(factor, tol=0.05)
+    split = nearest_split_ratio(factor, tol=0.05, candidates=COMBINED_RATIOS)
     if split is not None:
         notes.append(f"報告書 {older.doc_id} の1株配当を係数 {split:g} で新しい基準に換算（新しい報告書が分割後の基準で記載）")
         return split
@@ -167,8 +185,16 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
     known = sorted(known_splits or [])
 
     merged = [replace(p) for p in reports[0].periods]
+    filed = reports[0].filing_date
     for older in reports[1:]:
-        factor = _basis_factor(merged, older, notes)
+        expected = None
+        if known and filed and older.latest is not None:
+            product = 1.0
+            for d, r in known:
+                if older.latest.end - timedelta(days=7) < d <= filed - timedelta(days=2):
+                    product *= r
+            expected = 1 / product if abs(product - 1) > 1e-9 else None
+        factor = _basis_factor(merged, older, notes, expected)
         dps_factor = _dividend_factor(merged, older, notes)
         for p in older.periods:
             if any(_same_period(p.end, m.end) for m in merged):
@@ -232,16 +258,19 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
         if basis == "after_interim":
             cur.dps = cur.interim_dps / split + (cur.dps - cur.interim_dps)
             cur.interim_dps /= split
-        # EPS/BPS も未修正（分割の前後で BPS が倍率どおりに飛ぶ）なら割り戻す
-        if prev.bps and cur.bps:
-            observed = prev.bps / cur.bps
-            if split / 1.35 <= observed <= split * 1.35:
-                notes.append(f"{cur.end} 期より前の EPS・BPS が分割未修正とみられるため割り戻した")
-                for j in range(i):
-                    if merged[j].eps is not None:
-                        merged[j].eps /= split
-                    if merged[j].bps is not None:
-                        merged[j].bps /= split
+        # EPS/BPS も未修正（BPS が倍率どおりに飛ぶ）なら割り戻す。有報は当期と前期だけを
+        # 分割後の基準に直し、それより前の期は直さないことがある（フィード・ワン）ので、
+        # 株式数が変わった期から 2 期前までの境目を探す
+        for j in range(i, max(i - 3, 0), -1):
+            a, b = merged[j - 1], merged[j]
+            if a.bps and b.bps and split / 1.35 <= a.bps / b.bps <= split * 1.35:
+                notes.append(f"{b.end} 期より前の EPS・BPS が分割未修正とみられるため割り戻した")
+                for k in range(j):
+                    if merged[k].eps is not None:
+                        merged[k].eps /= split
+                    if merged[k].bps is not None:
+                        merged[k].bps /= split
+                break
     splits.sort()
 
     missing_shares = sum(1 for p in merged if not p.shares)

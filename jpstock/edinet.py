@@ -162,18 +162,25 @@ class EdinetClient:
                 self.log(f"  書類一覧 {n}/{total} 日分")
             yield from self.annual_reports_on(start + timedelta(days=n))
 
-    def latest_annual_reports(self, start: date, end: date) -> dict[str, dict]:
-        """期間内に提出された有価証券報告書のうち、会社ごとに最新の 1 通."""
-        latest: dict[str, dict] = {}
+    def annual_report_candidates(self, start: date, end: date) -> dict[str, list[dict]]:
+        """期間内に提出された有価証券報告書を、会社ごとに新しい順（期末日・提出日時の順）に並べる.
+
+        本体の有報とは別の有報（クレディセゾンの 5 月末期末のものなど）を出す会社があるので、
+        いちばん新しい 1 通に主要な経営指標が無ければ次の候補を使えるよう、全部返す。
+        """
+        found: dict[str, list[dict]] = {}
         for row in self.scan(start, end, progress=True):
             code = row.get("edinetCode")
             if not code or not row.get("secCode") or row.get("xbrlFlag") != "1":
                 continue
-            key = (row.get("periodEnd") or "", row.get("submitDateTime") or "")
-            cur = latest.get(code)
-            if cur is None or key > (cur.get("periodEnd") or "", cur.get("submitDateTime") or ""):
-                latest[code] = row
-        return latest
+            found.setdefault(code, []).append(row)
+        for rows in found.values():
+            rows.sort(key=lambda r: (r.get("periodEnd") or "", r.get("submitDateTime") or ""), reverse=True)
+        return found
+
+    def latest_annual_reports(self, start: date, end: date) -> dict[str, dict]:
+        """期間内に提出された有価証券報告書のうち、会社ごとに最新の 1 通."""
+        return {code: rows[0] for code, rows in self.annual_report_candidates(start, end).items()}
 
     def find_annual_report(self, edinet_code: str, period_end: date) -> Optional[dict]:
         """指定した期末日に近い（±45日）有価証券報告書を探す."""

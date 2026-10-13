@@ -189,7 +189,11 @@ def run_pipeline(
     log(f"対象: 上場 {len(companies)} 社")
 
     log("有価証券報告書を検索中…")
-    latest_docs = client.latest_annual_reports(as_of - timedelta(days=lookback_days), as_of)
+    start = as_of - timedelta(days=lookback_days)
+    if hasattr(client, "annual_report_candidates"):
+        candidates = client.annual_report_candidates(start, as_of)
+    else:
+        candidates = {k: [v] for k, v in client.latest_annual_reports(start, as_of).items()}
 
     rows: list[ScreenRow] = []
     for i, company in enumerate(companies, 1):
@@ -197,11 +201,15 @@ def run_pipeline(
             log(f"  有報の指標 {i}/{len(companies)} 社")
         row = ScreenRow(company=company)
         rows.append(row)
-        doc = latest_docs.get(company.edinet_code)
-        if doc is None:
-            continue
+        docs = candidates.get(company.edinet_code) or []
         try:
-            row.report = client.annual_report(doc["docID"])
+            for n, doc in enumerate(docs):
+                report = client.annual_report(doc["docID"])
+                if report.latest is not None or n == len(docs) - 1:
+                    row.report = report
+                    if n:
+                        row.notes.append(f"最新の有報 {docs[0]['docID']} に主要な経営指標が無いため {doc['docID']} を使用")
+                    break
         except (EdinetError, ValueError) as exc:
             row.errors.append(f"有報取得失敗: {exc}")
 
@@ -210,7 +218,15 @@ def run_pipeline(
     prices = price_source([r.company.sec_code for r in targets])
 
     for row in targets:
+        latest = row.report.latest
+        if not latest.shares and latest.net_income and latest.eps and latest.net_income / latest.eps > 0:
+            # 期末発行済株式総数が表に無い（アドヴァンの当期など）ときは、純利益 ÷ EPS の株数で時価総額を概算する
+            latest.shares = latest.net_income / latest.eps
+            row.notes.append("期末発行済株式総数が有報の表に無いため、時価総額は純利益÷EPSの株数（自己株式を除く期中平均）で概算")
         row.price = prices.get(row.company.sec_code)
+        if row.price and row.price.symbol and not row.price.symbol.endswith(".T"):
+            exchange = {"S": "札幌証券取引所", "F": "福岡証券取引所"}.get(row.price.symbol[-1], row.price.symbol)
+            row.notes.append(f"株価は{exchange}の終値（{row.price.symbol}）")
         # 期の途中の分割で中間配当が分割前の基準のままなら、当期の 1 株配当を直してから判定する
         single = merge_reports([row.report], row.price.splits if row.price else [])
         report = replace(row.report, periods=single.periods)

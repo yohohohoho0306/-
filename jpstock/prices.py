@@ -21,6 +21,7 @@ class PriceInfo:
     price: float
     as_of: date
     splits: list[tuple[date, float]] = field(default_factory=list)  # (日付, 倍率) 例: 2.0 = 1→2 分割
+    symbol: str = ""  # 取得に使った Yahoo のコード（7203.T など。札証は .S、福証は .F）
 
     def split_factor_after(self, day: date) -> float:
         """day より後に行われた分割・併合の倍率の積."""
@@ -76,8 +77,8 @@ def parse_download_frame(df, tickers: Iterable[str]) -> dict[str, PriceInfo]:
             s = frame["Stock Splits"].dropna()
             for idx, ratio in s[(s > 0) & (s != 1)].items():
                 splits.append((idx.date(), float(ratio)))
-        out[ticker.removesuffix(".T")] = PriceInfo(
-            price=float(close.iloc[-1]), as_of=close.index[-1].date(), splits=splits
+        out[ticker.rsplit(".", 1)[0]] = PriceInfo(
+            price=float(close.iloc[-1]), as_of=close.index[-1].date(), splits=splits, symbol=ticker
         )
     return out
 
@@ -148,15 +149,31 @@ def fetch_prices(
     path = Path(cache_dir) / f"prices_{date.today().isoformat()}.json" if cache_dir else None
     cached = _load_json(path)
     prices: dict[str, PriceInfo] = {
-        c: PriceInfo(price=v[0], as_of=date.fromisoformat(v[1]), splits=[(date.fromisoformat(d), r) for d, r in v[2]])
+        c: PriceInfo(price=v[0], as_of=date.fromisoformat(v[1]), splits=[(date.fromisoformat(d), r) for d, r in v[2]],
+                     symbol=v[3] if len(v) > 3 else f"{c}.T")
         for c, v in cached.items()
     }
     todo = [c for c in codes if c not in prices]
     if cached:
         log(f"  株価 {len(codes) - len(todo)} 銘柄はキャッシュを使用")
-    for i in range(0, len(todo), chunk):
-        tickers = [f"{c}.T" for c in todo[i:i + chunk]]
-        log(f"  株価 {i + len(tickers)}/{len(todo)} 銘柄")
+    # 東証（.T）で取れなかった銘柄は札証（.S）・福証（.F）でも探す（名証は Yahoo に無い）
+    batches = [[f"{c}.T" for c in todo[i:i + chunk]] for i in range(0, len(todo), chunk)]
+    batches.append(None)  # 東証の分が終わった印
+    while batches:
+        tickers = batches.pop(0)
+        if tickers is None:
+            rest = [c for c in todo if c not in prices]
+            if rest:
+                log(f"  株価: 東証で取れなかった {len(rest)} 銘柄を札証・福証で探す")
+                batches += [[f"{c}{suffix}" for c in rest] for suffix in (".S", ".F")]
+            continue
+        if not tickers:
+            continue
+        tickers = [t for t in tickers if t.rsplit(".", 1)[0] not in prices]
+        if not tickers:
+            continue
+        if tickers[0].endswith(".T"):
+            log(f"  株価 {todo.index(tickers[-1][:-2]) + 1}/{len(todo)} 銘柄")
         for attempt in range(retries + 1):
             collector = _LogCollector()
             yf_logger = logging.getLogger("yfinance")
@@ -171,8 +188,9 @@ def fetch_prices(
             got = parse_download_frame(df, tickers)
             prices.update(got)
             for code, info in got.items():
-                cached[code] = [info.price, info.as_of.isoformat(), [[d.isoformat(), r] for d, r in info.splits]]
-            limited = _rate_limited(yf, [t for t in tickers if t.removesuffix(".T") not in got], collector.messages)
+                cached[code] = [info.price, info.as_of.isoformat(), [[d.isoformat(), r] for d, r in info.splits],
+                                info.symbol]
+            limited = _rate_limited(yf, [t for t in tickers if t.rsplit(".", 1)[0] not in got], collector.messages)
             if not limited or attempt == retries:
                 if limited:
                     log(f"  株価: {len(limited)} 銘柄はアクセス制限で取得できず")
@@ -215,6 +233,8 @@ def fetch_split_history(
                     sleep(30 * 2 ** attempt)
                     continue
                 break
+            if series is None:  # 東証に無い銘柄（札証・福証のみなど）は None が返る
+                series = {}
             out[code] = [(idx.date(), float(r)) for idx, r in series.items() if r > 0 and r != 1]
             cached[code] = [[d.isoformat(), r] for d, r in out[code]]
             break
