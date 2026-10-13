@@ -1,8 +1,8 @@
 """EDINET API v2 のクライアント（ディスクキャッシュ付き）.
 
 - 書類一覧（documents.json）は日付ごとに、有価証券報告書の行だけをキャッシュする。
-- 書類本体（type=1 の ZIP）は保存せず、取り出した指標（AnnualReport）だけを
-  JSON でキャッシュする。
+- 書類本体（type=1 の ZIP）は保存せず、主要な経営指標等の推移などの要素の値だけを
+  gzip の JSON でキャッシュする（取り出し方を変えてもキャッシュから計算し直せる）。
 - API キーは環境変数 EDINET_API_KEY から読む。エラーメッセージや例外に
   キーが混ざらないようにしている。
 """
@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import io
 import json
 import os
@@ -21,7 +22,9 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
-from .xbrl import PARSER_VERSION, AnnualReport, report_from_zip
+from .xbrl import (
+    FACTS_VERSION, AnnualReport, build_report, extract_instance, facts_from_dict, facts_to_dict, parse_instance,
+)
 
 API_BASE = "https://api.edinet-fsa.go.jp/api/v2"
 CODELIST_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/codelist/Edinetcode.zip"
@@ -179,21 +182,24 @@ class EdinetClient:
     # ---- 書類本体 -----------------------------------------------------------
 
     def annual_report(self, doc_id: str) -> AnnualReport:
-        """有価証券報告書の XBRL を取得して AnnualReport にする（結果をキャッシュ）."""
-        path = self.cache_dir / "reports" / f"{doc_id}.json"
+        """有価証券報告書の XBRL を取得して AnnualReport にする.
+
+        書類本体は保存せず、主要な経営指標等の推移・DEI・配当政策の要素だけを gzip の JSON で
+        キャッシュする。指標の取り出し方を変えても、キャッシュから計算し直せる。
+        """
+        path = self.cache_dir / "reports" / f"{doc_id}.json.gz"
         if path.exists():
-            cached = json.loads(path.read_text(encoding="utf-8"))
-            # 取り出し方を変えた後の古いキャッシュは使わずに取り直す
-            if cached.pop("parser_version", 1) == PARSER_VERSION:
-                return AnnualReport.from_dict(cached)
+            cached = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+            if cached.get("facts_version") == FACTS_VERSION:
+                return build_report(*facts_from_dict(cached), doc_id=doc_id)
         resp = self._get(f"{API_BASE}/documents/{doc_id}", {"type": 1})
         if not resp.content.startswith(b"PK"):
             # エラー時は JSON（例: {"metadata": {"status": "404", ...}}）が返る
             raise EdinetError(f"書類 {doc_id} の取得結果が ZIP ではありません: {resp.content[:200]!r}")
-        report = report_from_zip(resp.content, doc_id)
-        data = {"parser_version": PARSER_VERSION, **report.to_dict()}
-        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        return report
+        facts, contexts = parse_instance(extract_instance(resp.content))
+        data = facts_to_dict(facts, contexts)
+        path.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8")))
+        return build_report(*facts_from_dict(data), doc_id=doc_id)
 
 
 def parse_code_list(raw: bytes) -> list[Company]:

@@ -25,7 +25,7 @@ from typing import Callable, Optional
 
 from .edinet import Company, EdinetClient, EdinetError
 from .history import SPLIT_RATIOS, History, merge_reports
-from .prices import PriceInfo, fetch_prices, load_prices_csv
+from .prices import PriceInfo, fetch_prices, fetch_split_history, load_prices_csv
 from .ricky import (
     Criteria, Stage1, Stage2, Stage3,
     evaluate_stage1, evaluate_stage2, evaluate_stage3, is_financial,
@@ -151,6 +151,7 @@ def run_pipeline(
     stage2_all: bool = False,
     criteria: Criteria = Criteria(),
     log: Callable[[str], None] = _log,
+    split_source: Optional[Callable[[list[str]], dict[str, list[tuple[date, float]]]]] = None,
 ) -> list[ScreenRow]:
     companies = client.companies()
     if codes:
@@ -181,7 +182,13 @@ def run_pipeline(
 
     for row in targets:
         row.price = prices.get(row.company.sec_code)
-        report, note = adjust_for_later_splits(row.report, row.price)
+        # 期の途中の分割で中間配当が分割前の基準のままなら、当期の 1 株配当を直してから判定する
+        single = merge_reports([row.report], row.price.splits if row.price else [])
+        report = replace(row.report, periods=single.periods)
+        if report.latest.dps != row.report.latest.dps:
+            row.notes.append(f"当期の1株配当を、分割前の中間配当を割り戻して {report.latest.dps:g} 円とした"
+                             f"（有報の記載は {row.report.latest.dps:g} 円）")
+        report, note = adjust_for_later_splits(report, row.price)
         if note:
             row.notes.append(note)
         row.stage1 = evaluate_stage1(
@@ -190,6 +197,7 @@ def run_pipeline(
 
     stage2_targets = [r for r in targets if stage2_all or (r.stage1 and r.stage1.passed)]
     log(f"第2段階: {len(stage2_targets)} 銘柄の過去の有報を取得中…")
+    split_history = split_source([r.company.sec_code for r in stage2_targets]) if split_source else {}
     for i, row in enumerate(stage2_targets, 1):
         if i % 20 == 0:
             log(f"  第2段階 {i}/{len(stage2_targets)} 銘柄")
@@ -204,7 +212,8 @@ def run_pipeline(
                 reports.append(client.annual_report(doc["docID"]))
             except (EdinetError, ValueError) as exc:
                 row.errors.append(f"{years}年前の有報取得失敗: {exc}")
-        row.history = merge_reports(reports)
+        known = split_history.get(row.company.sec_code) or (row.price.splits if row.price else [])
+        row.history = merge_reports(reports, known)
         row.stage2 = evaluate_stage2(row.history, criteria)
         row.stage3 = evaluate_stage3(
             row.report.dividend_policy,
@@ -417,12 +426,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.prices:
         table = load_prices_csv(args.prices)
         price_source = lambda codes: {c: table[c] for c in codes if c in table}  # noqa: E731
+        split_source = None
     else:
         price_source = fetch_prices
+        split_source = fetch_split_history
 
     try:
         rows = run_pipeline(client, price_source, as_of, codes=args.codes,
-                            lookback_days=args.lookback_days, stage2_all=args.stage2_all)
+                            lookback_days=args.lookback_days, stage2_all=args.stage2_all,
+                            split_source=split_source)
     except EdinetError as exc:
         print(f"エラー: {exc}", file=sys.stderr)
         return 1

@@ -15,8 +15,8 @@ from datetime import date
 from typing import Optional
 from xml.etree import ElementTree as ET
 
-# 取り出し方を変えたら上げる（古い版でキャッシュした指標は取り直す）
-PARSER_VERSION = 2
+# キャッシュする要素の範囲（_keep_fact）を変えたら上げる（古い版のキャッシュは取り直す）
+FACTS_VERSION = 1
 
 _XBRLI = "{http://www.xbrl.org/2003/instance}"
 _XSI_NIL = "{http://www.w3.org/2001/XMLSchema-instance}nil"
@@ -52,6 +52,7 @@ CONSOLIDATED_METRICS: dict[str, list[str]] = {
     ],
     "equity_ratio": [
         "RatioOfOwnersEquityToGrossAssetsIFRSSummaryOfBusinessResults",
+        "EquityToAssetRatioIFRSSummaryOfBusinessResults",
         "EquityToAssetRatioUSGAAPSummaryOfBusinessResults",
         "EquityToAssetRatioSummaryOfBusinessResults",
     ],
@@ -60,11 +61,14 @@ CONSOLIDATED_METRICS: dict[str, list[str]] = {
         "RateOfReturnOnEquityUSGAAPSummaryOfBusinessResults",
         "RateOfReturnOnEquitySummaryOfBusinessResults",
     ],
+    # BPS が載っていない報告書（トヨタの IFRS など）で BPS を求めるのに使う
+    "owners_equity": ["EquityAttributableToOwnersOfParentIFRSSummaryOfBusinessResults"],
 }
 
 # 提出会社（個別）の表に載る指標。個別コンテキストを優先して探す。
 PARENT_METRICS: dict[str, list[str]] = {
     "dps": ["DividendPaidPerShareSummaryOfBusinessResults"],
+    "interim_dps": ["InterimDividendPaidPerShareSummaryOfBusinessResults"],
     "shares": ["TotalNumberOfIssuedSharesSummaryOfBusinessResults"],
 }
 
@@ -102,6 +106,9 @@ class FiscalPeriod:
     equity_ratio: Optional[float] = None  # %
     roe: Optional[float] = None  # %
     shares: Optional[float] = None  # 期末発行済株式総数（提出会社）
+    interim_dps: Optional[float] = None  # 1 株配当のうち中間配当
+    owners_equity: Optional[float] = None  # 親会社の所有者に帰属する持分（IFRS。BPS が無いときに使う）
+    bps_source: Optional[str] = None  # BPS を表から直接取れなかったときの取り方
     nonconsolidated: bool = False  # 連結の報告書だが、この期は個別の値で補った
     standard: Optional[str] = None  # EPS を取った要素の会計基準（JP / IFRS / US）
 
@@ -183,6 +190,15 @@ def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+def _keep_fact(name: str) -> bool:
+    """キャッシュに残す要素: 主要な経営指標等の推移の全項目・DEI・配当政策など.
+
+    取り出し方（build_report）を後で変えても、書類を取り直さずにキャッシュから計算し直せるよう、
+    いま使っていない項目も含めて「主要な経営指標等の推移」はすべて残す。
+    """
+    return name in _WANTED or name.endswith("SummaryOfBusinessResults") or name.endswith("DEI")
+
+
 def parse_instance(xbrl: bytes) -> tuple[dict[str, dict[str, str]], dict[str, tuple[Optional[date], date]]]:
     """XBRL インスタンスを読み、必要な要素の値とコンテキストを返す.
 
@@ -216,7 +232,7 @@ def parse_instance(xbrl: bytes) -> tuple[dict[str, dict[str, str]], dict[str, tu
         ctx_ref = elem.get("contextRef")
         if ctx_ref is not None:
             name = _local(tag)
-            if name in _WANTED and elem.get(_XSI_NIL) != "true" and elem.text is not None:
+            if _keep_fact(name) and elem.get(_XSI_NIL) != "true" and elem.text is not None:
                 facts.setdefault(name, {})[ctx_ref] = elem.text.strip()
             elem.clear()
 
@@ -276,9 +292,30 @@ def _standard_of(element: Optional[str]) -> Optional[str]:
 
 
 _KIND = {
-    "eps": "Duration", "net_income": "Duration", "roe": "Duration", "dps": "Duration",
+    "eps": "Duration", "net_income": "Duration", "roe": "Duration", "dps": "Duration", "interim_dps": "Duration",
     "bps": "Instant", "total_assets": "Instant", "equity_ratio": "Instant", "shares": "Instant",
+    "owners_equity": "Instant",
 }
+
+
+def _fill_missing_bps(period: FiscalPeriod, facts, idx: int, nonconsolidated: bool) -> None:
+    """BPS が表に無い期は、親会社所有者帰属持分 ÷（純利益 ÷ EPS）で概算する.
+
+    比率の要素に 1 株当たりの金額が誤って入っていることがある（トヨタの EquityToAssetRatioIFRS など）。
+    比率としてあり得ない値（1.5 超）が概算値と 5% 以内で一致すれば、それを BPS とみなす。
+    """
+    if period.bps is not None or not period.owners_equity or not period.eps or not period.net_income:
+        return
+    implied_shares = period.net_income / period.eps
+    if implied_shares <= 0:
+        return
+    estimate = period.owners_equity / implied_shares
+    for name in CONSOLIDATED_METRICS["equity_ratio"]:
+        value = _pick(facts, [name], idx, "Instant", nonconsolidated)
+        if value is not None and value > 1.5 and abs(value / estimate - 1) <= 0.05:
+            period.bps, period.bps_source = value, f"比率の要素（{name}）に入っていた値"
+            return
+    period.bps, period.bps_source = estimate, "親会社所有者帰属持分÷(純利益÷EPS)の概算"
 
 
 def build_report(
@@ -329,7 +366,13 @@ def build_report(
         )
         period = FiscalPeriod(end=end, start=start, nonconsolidated=has_consolidated and use_parent)
         for metric, names in CONSOLIDATED_METRICS.items():
-            value, element = _pick_named(facts, names, idx, _KIND[metric], nonconsolidated=use_parent)
+            if metric == "equity_ratio":
+                # 比率としてあり得ない値（1.5 超。1 株当たりの金額などの誤り）は飛ばして次の要素を見る
+                value = next((v for v in (_pick(facts, [n], idx, "Instant", use_parent) for n in names)
+                              if v is not None and abs(v) <= 1.5), None)
+                element = None
+            else:
+                value, element = _pick_named(facts, names, idx, _KIND[metric], nonconsolidated=use_parent)
             if value is not None and metric in _RATIO_METRICS:
                 value *= 100.0  # EDINET の % 項目は 0.378 のような小数で入っている
             setattr(period, metric, value)
@@ -340,6 +383,7 @@ def build_report(
             if value is None:
                 value = _pick(facts, names, idx, _KIND[metric], nonconsolidated=False)
             setattr(period, metric, value)
+        _fill_missing_bps(period, facts, idx, use_parent)
         report.periods.append(period)
 
     report.periods.sort(key=lambda p: p.end)
@@ -350,3 +394,23 @@ def report_from_zip(zip_bytes: bytes, doc_id: str) -> AnnualReport:
     """EDINET API の ZIP（type=1）から AnnualReport を作る."""
     facts, contexts = parse_instance(extract_instance(zip_bytes))
     return build_report(facts, contexts, doc_id)
+
+
+def facts_to_dict(facts: dict[str, dict[str, str]], contexts: dict[str, tuple[Optional[date], date]]) -> dict:
+    """parse_instance の結果を JSON にできる形にする（使うコンテキストだけ残す）."""
+    used = {ctx for values in facts.values() for ctx in values}
+    keep = {c: v for c, v in contexts.items() if c in used and (_CTX_RE.match(c) or c == "FilingDateInstant")}
+    keep.setdefault("FilingDateInstant", contexts.get("FilingDateInstant"))
+    return {
+        "facts_version": FACTS_VERSION,
+        "facts": {name: {c: v for c, v in values.items() if c in keep} for name, values in facts.items()},
+        "contexts": {c: [v[0].isoformat() if v[0] else None, v[1].isoformat()] for c, v in keep.items() if v},
+    }
+
+
+def facts_from_dict(d: dict) -> tuple[dict[str, dict[str, str]], dict[str, tuple[Optional[date], date]]]:
+    contexts = {
+        c: (date.fromisoformat(v[0]) if v[0] else None, date.fromisoformat(v[1]))
+        for c, v in d.get("contexts", {}).items()
+    }
+    return d.get("facts", {}), contexts

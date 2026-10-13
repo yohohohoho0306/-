@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import zipfile
+from dataclasses import replace
 from datetime import date
 
 import pandas as pd
@@ -135,6 +136,32 @@ def test_ifrs_values_take_priority():
     assert any("JP→IFRS" in n for n in merge_reports([report]).notes)
 
 
+def test_bps_from_mistagged_ratio_element_or_estimate():
+    # トヨタ型: IFRS の BPS 要素が無く、自己資本比率の要素（EquityToAssetRatioIFRS）に BPS が入っている
+    periods = five_periods()
+    xbrl = make_instance(periods)
+    for i, p in enumerate(periods):
+        idx = 4 - i
+        prefix = "CurrentYear" if idx == 0 else f"Prior{idx}Year"
+        xbrl = xbrl.replace(
+            f'<jpcrp_cor:NetAssetsPerShareSummaryOfBusinessResults contextRef="{prefix}Instant" unitRef="u" decimals="2">{p["bps"]}</jpcrp_cor:NetAssetsPerShareSummaryOfBusinessResults>'.encode(),
+            b"",
+        )
+    owners = lambda p: p["bps"] * p["ni"] / p["eps"]  # noqa: E731  純利益 / EPS の株数で BPS になる持分
+    extra = "".join(
+        f'<jpcrp_cor:EquityAttributableToOwnersOfParentIFRSSummaryOfBusinessResults contextRef="{"CurrentYear" if 4 - i == 0 else f"Prior{4 - i}Year"}Instant" unitRef="u" decimals="-6">{owners(p)}</jpcrp_cor:EquityAttributableToOwnersOfParentIFRSSummaryOfBusinessResults>'
+        for i, p in enumerate(periods)
+    )
+    estimated = build_report(*parse_instance(xbrl.replace(b"</xbrli:xbrl>", extra.encode() + b"</xbrli:xbrl>")), doc_id="X")
+    assert estimated.latest.bps == pytest.approx(1400) and "概算" in estimated.latest.bps_source
+
+    mistag = ('<jpcrp_cor:EquityToAssetRatioIFRSSummaryOfBusinessResults contextRef="CurrentYearInstant" '
+              'unitRef="u" decimals="2">1412.5</jpcrp_cor:EquityToAssetRatioIFRSSummaryOfBusinessResults>')
+    report = build_report(*parse_instance(xbrl.replace(b"</xbrli:xbrl>", (extra + mistag).encode() + b"</xbrli:xbrl>")), doc_id="X")
+    assert report.latest.bps == 1412.5 and "比率の要素" in report.latest.bps_source
+    assert report.latest.equity_ratio == pytest.approx(45.2)  # 1.5 超の値は自己資本比率として使わない
+
+
 def test_extract_instance_prefers_public_doc_asr():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -186,6 +213,54 @@ def test_merge_fixes_unadjusted_eps_bps_inside_one_report():
     assert [p.bps for p in h.periods] == pytest.approx([500, 540, 590, 640, 700])
     assert [p.eps for p in h.periods][:2] == pytest.approx([50, 55])
     assert any("未修正" in n for n in h.notes)
+
+
+def test_merge_keeps_dividends_already_restated_for_split():
+    # 住友林業型: 新しい報告書は過去の 1 株配当も分割後（1→3）の基準に直して記載。古い報告書は分割前の基準。
+    newer = AnnualReport(doc_id="new", periods=[
+        fp(2022, 50, 500, 80 / 3, 1_000_000), fp(2023, 55, 550, 30, 1_000_000), fp(2024, 60, 600, 32, 1_000_000),
+        fp(2025, 65, 650, 34, 1_000_000), fp(2026, 70, 700, 36, 3_000_000),
+    ])
+    older = AnnualReport(doc_id="old", periods=[
+        fp(2018, 120, 1200, 60, 1_000_000), fp(2019, 126, 1260, 66, 1_000_000), fp(2020, 132, 1320, 70, 1_000_000),
+        fp(2021, 138, 1380, 75, 1_000_000), fp(2022, 150, 1500, 80, 1_000_000),
+    ])
+    h = merge_reports([newer, older], known_splits=[(date(2025, 6, 27), 3.0)])
+    dps = [p.dps for p in h.periods]
+    assert dps == pytest.approx([20, 22, 70 / 3, 25, 80 / 3, 30, 32, 34, 36])
+    assert evaluate_stage2(h).dividend_cuts == []
+    assert any("修正済み" in n for n in h.notes)
+
+
+def test_merge_uses_known_split_when_share_count_also_changed_by_buyback():
+    # イエローハット型: 1→2 の分割と自己株式の消却が同じ期で、株式数は 1.79 倍
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2022, 50, 500, 58, 50_000_000), fp(2023, 55, 550, 62, 50_000_000), fp(2024, 60, 600, 66, 50_000_000),
+        fp(2025, 65, 650, 100, 48_000_000), fp(2026, 70, 700, 62, 86_000_000),
+    ])
+    without = merge_reports([report])
+    assert any("分割以外の可能性" in n for n in without.notes)
+    h = merge_reports([report], known_splits=[(date(2025, 3, 28), 2.0)])
+    assert h.splits == [(date(2026, 3, 31), 2.0)]
+    assert [p.dps for p in h.periods] == pytest.approx([29, 31, 33, 50, 62])
+    assert any("1.79 倍" in n for n in h.notes)
+
+
+def test_merge_adjusts_interim_dividend_for_mid_year_split():
+    # トヨタ型: 期の途中（中間配当の基準日の後）に 1→5 の分割。当期の年間配当は「分割前の中間 120 円＋分割後の期末 28 円」
+    periods = [fp(2020, 700, 7000, 220, 3_000_000), fp(2021, 800, 8000, 240, 3_000_000),
+               fp(2022, 205, 1900, 148, 15_000_000), fp(2023, 180, 2090, 60, 15_000_000)]
+    for p, interim in zip(periods, (100, 120, 120, 25)):
+        p.interim_dps = interim
+    # 古い期の EPS/BPS は分割未修正（報告書をまたいだ想定）だが、ここでは配当だけを見る
+    h = merge_reports([AnnualReport(doc_id="r", periods=periods)], known_splits=[(date(2021, 9, 29), 5.0)])
+    assert [p.dps for p in h.periods] == pytest.approx([44, 48, 52, 60])
+    assert any("中間配当" in n for n in h.notes)
+    # 分割日が分からなくても、配当のつながりから同じ判断になる
+    periods2 = [replace(p) for p in periods]
+    for p, d, i in zip(periods2, (220, 240, 148, 60), (100, 120, 120, 25)):
+        p.dps, p.interim_dps = d, i
+    assert [p.dps for p in merge_reports([AnnualReport(doc_id="r", periods=periods2)]).periods] == pytest.approx([44, 48, 52, 60])
 
 
 # ---- 判定 -----------------------------------------------------------------
@@ -316,6 +391,20 @@ def test_client_filters_and_caches_document_lists(tmp_path):
     assert session.calls[0][1]["Subscription-Key"] == "SECRET"
     assert client.annual_reports_on(date(2026, 6, 20)) == rows  # 2 回目はキャッシュ
     assert len(session.calls) == 1
+
+
+def test_client_caches_report_facts_and_rebuilds(tmp_path):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("XBRL/PublicDoc/jpcrp030000-asr-001_E0-000_2026-03-31_01_2026-06-20.xbrl",
+                    make_instance(five_periods(), policy="累進配当"))
+    session = FakeSession([FakeResponse(content=buf.getvalue())])
+    client = EdinetClient(api_key="K", cache_dir=tmp_path, sleep=0, session=session)
+    first = client.annual_report("S100TEST")
+    second = client.annual_report("S100TEST")  # 2 回目はキャッシュした要素から組み立て直す
+    assert len(session.calls) == 1
+    assert second == first and second.latest.eps == 140 and second.filing_date == date(2026, 6, 20)
+    assert (tmp_path / "reports" / "S100TEST.json.gz").exists()
 
 
 def test_client_error_does_not_leak_api_key(tmp_path, monkeypatch):

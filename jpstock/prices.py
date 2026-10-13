@@ -99,3 +99,24 @@ def fetch_prices(
         prices.update(parse_download_frame(df, tickers))
     return prices
 
+
+
+def fetch_split_history(
+    codes: list[str],
+    log: Callable[[str], None] = lambda msg: print(msg, file=sys.stderr),
+) -> dict[str, list[tuple[date, float]]]:
+    """Yahoo Finance から全期間の分割・併合の履歴（権利落ち日, 倍率）を取得する（要ネットワーク）."""
+    import yfinance as yf
+
+    out: dict[str, list[tuple[date, float]]] = {}
+    for n, code in enumerate(codes, 1):
+        if n % 50 == 0:
+            log(f"  分割履歴 {n}/{len(codes)} 銘柄")
+        for _ in range(2):
+            try:
+                series = yf.Ticker(f"{code}.T").splits
+            except Exception:  # noqa: BLE001 - 取れなければ株式数の変化だけで判定する
+                continue
+            out[code] = [(idx.date(), float(r)) for idx, r in series.items() if r > 0 and r != 1]
+            break
+    return out
