@@ -806,3 +806,28 @@ def test_yahoo_dividend_on_split_ex_date_is_treated_as_unadjusted():
     h = merge_reports([AnnualReport(doc_id="r", periods=periods)], [(date(2018, 12, 26), 2.0)], yahoo)
     assert [p.dps for p in h.periods] == pytest.approx([16.5, 18, 19, 20, 21])
     assert evaluate_stage2(h).dividend_cuts == []
+
+
+def test_payout_ratio_tells_whether_dividends_are_on_pre_split_basis():
+    # スターツ出版型: 2023/1/1 の 1→2 分割。有報は EPS だけ分割後の基準に直し、1 株配当は実額のまま。
+    # 60 円 ÷ 配当性向 9.9% ＝ 606 円 ≒ 提出会社 EPS 304 円 × 2 → 分割前の基準
+    periods = []
+    for k, (dps, eps, payout, sh) in enumerate([(40, 147.5, 0.136, 11_000_000), (60, 304.1, 0.099, 11_000_000),
+                                                (60, 463.0, 0.130, 22_000_000), (110, 475.7, 0.231, 22_000_000)]):
+        y = 2021 + k
+        per = FiscalPeriod(end=date(y, 12, 31), start=date(y, 1, 1), eps=eps, bps=1000 + 300 * k, dps=dps, shares=sh,
+                           net_income=1e9, total_assets=2e10, equity_ratio=50, roe=10, payout=payout, eps_parent=eps)
+        periods.append(per)
+    h = merge_reports([AnnualReport(doc_id="r", periods=periods)], [(date(2022, 12, 29), 2.0)])
+    assert [p.dps for p in h.periods] == pytest.approx([20, 30, 60, 110])
+
+
+def test_payout_ratio_confirms_mid_year_split_dividend():
+    # かわでん型: 2026/1/1 の 1→5 分割。2026/3 期の 181 円は「分割前の中間 145 円＋分割後の期末 36 円」。
+    # 配当性向 35.5% × EPS 183.10 円 ＝ 65 円 ＝ 145 / 5 + 36
+    prev = fp(2025, 122.58, 1108, 190, 2_000_000)
+    prev.payout, prev.eps_parent, prev.interim_dps = 0.310, 122.58, 40
+    cur = fp(2026, 183.10, 1269, 181, 10_000_000)
+    cur.payout, cur.eps_parent, cur.interim_dps = 0.355, 183.10, 145
+    h = merge_reports([AnnualReport(doc_id="r", periods=[prev, cur])])
+    assert [p.dps for p in h.periods] == pytest.approx([38, 65])

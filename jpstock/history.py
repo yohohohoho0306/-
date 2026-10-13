@@ -199,9 +199,36 @@ def _yahoo_says_unrestated(p: FiscalPeriod, dividends, after, splits, split: flo
     return decisions.pop() if len(decisions) == 1 else None
 
 
+def _payout_implied_dps(p: FiscalPeriod, offset: float = 1.0) -> Optional[float]:
+    """配当性向 × 提出会社 EPS（系列の EPS と同じ基準に換算済み）＝ その基準で見た 1 株配当."""
+    if p.payout and p.eps_parent and p.payout > 0 and p.eps_parent > 0:
+        return p.payout * p.eps_parent * offset
+    return None
+
+
+def _payout_says_unrestated(p: FiscalPeriod, split: float, between: float = 1.0, offset: float = 1.0) -> Optional[bool]:
+    """有報の配当性向から、その期の 1 株配当が分割前の基準のままか（True）、直してあるか（False）を判断する.
+
+    1 株配当 ÷ 配当性向 は、その配当を決めたときの 1 株当たり利益。EPS は有報で分割後の基準に
+    直してあるので、両者の比が分割の倍率なら配当は分割前の基準のまま（スターツ出版: 60 円 ÷ 9.9% ＝ 608 円、
+    EPS 304 円の 2 倍）。配当性向は小数第 3 位までなので、5% 以内で一致したときだけ決める。
+    offset は系列の最後の期末〜有報提出日の分割（EPS には反映済み、1 株配当には未反映）。
+    """
+    implied = _payout_implied_dps(p, offset)
+    if implied is None or not p.dps:
+        return None
+    q = p.dps / implied
+    d_true = min(abs(math.log(q / split)), abs(math.log(q / (split * between))))
+    d_false = min(abs(math.log(q)), abs(math.log(q / between)))
+    if min(d_true, d_false) < 0.05 and abs(d_true - d_false) > 0.02:
+        return d_true < d_false
+    return None
+
+
 def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_date: Optional[date],
                            dividends: Optional[list[tuple[date, float]]] = None, later: float = 1.0,
-                           after: Optional[date] = None, splits: Optional[list[tuple[date, float]]] = None) -> str:
+                           after: Optional[date] = None, splits: Optional[list[tuple[date, float]]] = None,
+                           offset: float = 1.0) -> str:
     """分割した期 i の前後で、1 株配当がどう記載されているかを判断する.
 
     - restated:       有報で分割後の基準に修正済み（何もしない）
@@ -211,16 +238,24 @@ def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_
     """
     prev, cur = merged[i - 1], merged[i]
     nxt = merged[i + 1].dps if i + 1 < len(merged) else None
-    has_interim = cur.interim_dps is not None and cur.interim_dps > 0 and cur.dps is not None
+    # 期の途中の分割で「分割前の中間＋分割後の期末」になりうるのは、期末配当（年間 − 中間）が正のときだけ
+    has_interim = (cur.interim_dps is not None and cur.dps is not None and 0 < cur.interim_dps < cur.dps)
     options = ["before_interim", "restated"]
-    # Yahoo の配当（分割調整後）と比べられれば、前の期の配当が分割前の基準のままかを直接確かめる。
+    # 前の期の配当が分割前の基準のままかを、まず有報の配当性向で、次に Yahoo の配当（分割調整後）で確かめる。
     # later は、この系列の最後の期より後の分割（Yahoo の値はそれも調整済み）
-    if abs(math.log(split)) >= math.log(1.4):
+    unrestated = _payout_says_unrestated(prev, split, offset=offset)
+    if unrestated is None and abs(math.log(split)) >= math.log(1.4):
         unrestated = _yahoo_says_unrestated(prev, dividends, after, splits, split, later=later)
-        if unrestated is True:
-            options = ["before_interim"]
-        elif unrestated is False:
-            return "restated"
+    if unrestated is True:
+        options = ["before_interim"]
+    elif unrestated is False:
+        return "restated"
+    # 分割の期の配当が「分割前の中間＋分割後の期末」の合計かは、配当性向が中間を割り戻した値と合えば確か
+    # （かわでん・トヨタ）。単純合計で配当性向を計算する会社（日本電計）もあるので、合わなくても否定はしない
+    implied_cur = _payout_implied_dps(cur, offset)
+    if implied_cur and has_interim and \
+            abs(math.log((cur.interim_dps / split + cur.dps - cur.interim_dps) / implied_cur)) < 0.05:
+        return "after_interim"
     if has_interim:
         options.append("after_interim")
         if ex_date is not None and cur.start is not None:
@@ -271,6 +306,8 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
             q = replace(p)
             if q.eps is not None:
                 q.eps *= factor
+            if q.eps_parent is not None:
+                q.eps_parent *= factor
             if q.bps is not None:
                 q.bps *= factor
             if q.dps is not None:
@@ -314,46 +351,20 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
     }
     splits: list[tuple[date, float]] = []
     later = 1.0  # 系列の最後の期末より後の分割（Yahoo の配当はそれも調整済み）
+    offset = 1.0  # そのうち有報提出日まで（EPS は有報で反映済み、1 株配当は未反映）
     if merged:
         for d, r in known:
             if d + _EFFECTIVE_LAG > merged[-1].end and r > 0:
                 later *= r
+                if filed and d <= filed - timedelta(days=2):
+                    offset *= r
     reverse_cut = max((d for d, r in known if 0 < r < 1), default=None)  # 最後の併合の権利落ち日
     split_at = {i: split for i, split, _, _ in found}
-    for i, split, ex_date, how in sorted(found, reverse=True):  # 新しい分割から処理する
-        prev, cur = merged[i - 1], merged[i]
-        splits.append((cur.end, split))
-        basis = _choose_dividend_basis(merged, i, split, ex_date, known_dividends, later, reverse_cut, known)
-        # 有報が直前の期だけを分割後の基準に直すこともある（キムラユニティー）ので、Yahoo の配当
-        # （分割調整後）と比べられる期は 1 期ずつ「分割前の基準のままか」を確かめる
-        per_period: dict[int, bool] = {}
-        if known_dividends and abs(math.log(split)) >= math.log(1.4):
-            for j in range(i):
-                # j と i の間にまだ処理していない分割があれば、その分の基準のずれ（between）もありうる
-                between = 1.0
-                for m, r in split_at.items():
-                    if j < m < i:
-                        between *= r
-                decided = _yahoo_says_unrestated(merged[j], known_dividends, reverse_cut, known, split, between, later)
-                if decided is not None:
-                    per_period[j] = decided
-        default = basis != "restated"
-        mixed = any(v != default for v in per_period.values())
-        notes.append(f"{cur.end} 期に株式分割・併合（{split:g} 倍、{how}）を検出。{labels[basis]}"
-                     + ("（一部の期は Yahoo の分割調整後の配当と比べて個別に判断）" if mixed else ""))
-        for j in range(i):
-            if not per_period.get(j, default):
-                continue
-            if merged[j].dps is not None:
-                merged[j].dps /= split
-            if merged[j].interim_dps is not None:
-                merged[j].interim_dps /= split
-        if basis == "after_interim":
-            cur.dps = cur.interim_dps / split + (cur.dps - cur.interim_dps)
-            cur.interim_dps /= split
-        # EPS/BPS も未修正（BPS が倍率どおりに飛ぶ）なら割り戻す。有報は当期と前期だけを
-        # 分割後の基準に直し、それより前の期は直さないことがある（フィード・ワン）ので、
-        # 株式数が変わった期から 2 期前までの境目を探す
+    # 1) EPS/BPS も未修正（BPS が倍率どおりに飛ぶ）なら割り戻す。有報は当期と前期だけを
+    #    分割後の基準に直し、それより前の期は直さないことがある（フィード・ワン）ので、
+    #    株式数が変わった期から 2 期前までの境目を探す。配当の判断（配当性向 × 提出会社 EPS）で
+    #    使うので、すべての分割について先に済ませる
+    for i, split, ex_date, how in sorted(found, reverse=True):
         for j in range(i, max(i - 3, 0), -1):
             a, b = merged[j - 1], merged[j]
             observed = a.bps / b.bps if a.bps and b.bps else None
@@ -362,11 +373,44 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
                     and abs(math.log(observed / split)) < 0.5 * abs(math.log(split)):
                 notes.append(f"{b.end} 期より前の EPS・BPS が分割未修正とみられるため割り戻した")
                 for k in range(j):
-                    if merged[k].eps is not None:
-                        merged[k].eps /= split
-                    if merged[k].bps is not None:
-                        merged[k].bps /= split
+                    for attr in ("eps", "bps", "eps_parent"):
+                        if getattr(merged[k], attr) is not None:
+                            setattr(merged[k], attr, getattr(merged[k], attr) / split)
                 break
+
+    # 2) 1 株配当を分割の基準にそろえる（新しい分割から）
+    for i, split, ex_date, how in sorted(found, reverse=True):
+        cur = merged[i]
+        splits.append((cur.end, split))
+        basis = _choose_dividend_basis(merged, i, split, ex_date, known_dividends, later, reverse_cut, known, offset)
+        # 有報が直前の期だけを分割後の基準に直すこともある（キムラユニティー）ので、分割の前の各期を
+        # 有報の配当性向（なければ Yahoo の分割調整後の配当）と比べて「分割前の基準のままか」を確かめる
+        per_period: dict[int, bool] = {}
+        for j in range(i):
+            # j と i の間にまだ処理していない分割があれば、その分の基準のずれ（between）もありうる
+            between = 1.0
+            for m, r in split_at.items():
+                if j < m < i:
+                    between *= r
+            decided = _payout_says_unrestated(merged[j], split, between, offset)
+            if decided is None and abs(math.log(split)) >= math.log(1.4):
+                decided = _yahoo_says_unrestated(merged[j], known_dividends, reverse_cut, known, split, between, later)
+            if decided is not None:
+                per_period[j] = decided
+        default = basis != "restated"
+        mixed = any(v != default for v in per_period.values())
+        notes.append(f"{cur.end} 期に株式分割・併合（{split:g} 倍、{how}）を検出。{labels[basis]}"
+                     + ("（一部の期は配当性向・Yahoo の配当と比べて個別に判断）" if mixed else ""))
+        for j in range(i):
+            if not per_period.get(j, default):
+                continue
+            if merged[j].dps is not None:
+                merged[j].dps /= split
+            if merged[j].interim_dps is not None:
+                merged[j].interim_dps /= split
+        if basis == "after_interim" and cur.interim_dps is not None and cur.dps is not None and cur.dps > cur.interim_dps:
+            cur.dps = cur.interim_dps / split + (cur.dps - cur.interim_dps)
+            cur.interim_dps /= split
     splits.sort()
 
     missing_shares = sum(1 for p in merged if not p.shares)

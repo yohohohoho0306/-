@@ -73,6 +73,9 @@ PARENT_METRICS: dict[str, list[str]] = {
                     "InterimDividendPaidPerShareCommonStockSummaryOfBusinessResults"],
     "shares": ["TotalNumberOfIssuedSharesSummaryOfBusinessResults",
                "CommonStocksTotalNumberOfIssuedSharesSummaryOfBusinessResults"],
+    # 配当性向と提出会社の EPS。1 株配当 ÷ 配当性向 で、その配当がどの株数の基準かを確かめるのに使う
+    "payout": ["PayoutRatioSummaryOfBusinessResults"],
+    "eps_parent": ["BasicEarningsLossPerShareSummaryOfBusinessResults"],
 }
 
 # % 表示の指標（XBRL では 0.378 のような小数で格納されるので 100 倍する）
@@ -113,6 +116,8 @@ class FiscalPeriod:
     owners_equity: Optional[float] = None  # 親会社の所有者に帰属する持分（IFRS。BPS が無いときに使う）
     bps_source: Optional[str] = None  # BPS を表から直接取れなかったときの取り方
     dps_assumed_zero: bool = False  # 1 株配当の欄が空（「－」）なので無配とみなした
+    payout: Optional[float] = None  # 配当性向（提出会社、0.355 のような小数）
+    eps_parent: Optional[float] = None  # 提出会社の 1 株当たり当期純利益（配当性向の計算の基準）
     nonconsolidated: bool = False  # 連結の報告書だが、この期は個別の値で補った
     standard: Optional[str] = None  # EPS を取った要素の会計基準（JP / IFRS / US）
 
@@ -297,6 +302,7 @@ def _standard_of(element: Optional[str]) -> Optional[str]:
 
 _KIND = {
     "eps": "Duration", "net_income": "Duration", "roe": "Duration", "dps": "Duration", "interim_dps": "Duration",
+    "payout": "Duration", "eps_parent": "Duration",
     "bps": "Instant", "total_assets": "Instant", "equity_ratio": "Instant", "shares": "Instant",
     "owners_equity": "Instant",
 }
