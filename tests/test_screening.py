@@ -758,3 +758,51 @@ def test_fetch_actions_reads_splits_and_dividends(tmp_path, monkeypatch):
     assert acts["9908"].dividends == [(date(2021, 3, 29), 33.3)]
     again = fetch_actions(["9908"], cache_dir=tmp_path, log=lambda m: None, sleep=lambda s: None)
     assert again["9908"].dividends == acts["9908"].dividends
+
+
+def test_dividends_restated_only_for_the_period_just_before_split():
+    # キムラユニティー型: 2025/4/1 の 1→2 分割。有報は直前の 2025/3 期だけ分割後の基準に直し、それより前は直していない
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2022, 40, 400, 26, 10_000_000), fp(2023, 44, 440, 42, 10_000_000), fp(2024, 48, 480, 55, 10_000_000),
+        fp(2025, 26, 260, 31.5, 10_000_000), fp(2026, 28, 280, 34, 20_000_000),
+    ])
+    yahoo = [(date(2022, 3, 29), 13.0), (date(2023, 3, 29), 21.0), (date(2024, 3, 28), 27.5),
+             (date(2025, 3, 28), 31.5), (date(2026, 3, 30), 34.0)]
+    h = merge_reports([report], [(date(2025, 3, 28), 2.0)], yahoo)
+    assert [p.dps for p in h.periods] == pytest.approx([13, 21, 27.5, 31.5, 34])
+    assert evaluate_stage2(h).dividend_cuts == []
+    assert any("個別に判断" in n for n in h.notes)
+
+
+def test_per_period_dividend_check_with_two_splits_and_unadjusted_yahoo_before_consolidation():
+    # 1→2 分割が 2 回（2022/7・2025/4）。有報は 2 回目の直前の期（2025/3）だけ直してある
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2022, 40, 400, 52, 5_000_000), fp(2023, 22, 220, 42, 10_000_000), fp(2024, 24, 240, 55, 10_000_000),
+        fp(2025, 13, 130, 31.5, 10_000_000), fp(2026, 14, 140, 34, 20_000_000),
+    ])
+    known = [(date(2022, 6, 29), 2.0), (date(2025, 3, 28), 2.0)]
+    yahoo = [(date(2022, 3, 29), 13.0), (date(2023, 3, 29), 21.0), (date(2024, 3, 28), 27.5),
+             (date(2025, 3, 28), 31.5), (date(2026, 3, 30), 34.0)]
+    h = merge_reports([report], known, yahoo)
+    assert [p.dps for p in h.periods] == pytest.approx([13, 21, 27.5, 31.5, 34])
+    # 併合（0.2 倍）より前の Yahoo の配当は併合で直されていないことがあるので使わない
+    report2 = AnnualReport(doc_id="r", periods=[
+        fp(2017, 50, 500, 6, 50_000_000), fp(2018, 260, 2600, 32, 10_000_000), fp(2019, 270, 2700, 34, 10_000_000),
+    ])
+    for per, interim in zip(report2.periods, (3, 3, 17)):
+        per.interim_dps = interim
+    h2 = merge_reports([report2], [(date(2017, 9, 27), 0.2)], [(date(2017, 3, 29), 1.2), (date(2018, 3, 28), 13.0)])
+    assert [p.dps for p in h2.periods] == pytest.approx([30, 15 + 29, 34])
+
+
+def test_yahoo_dividend_on_split_ex_date_is_treated_as_unadjusted():
+    # クリヤマ型: 12 月決算、1→2 分割（2019/1/1）と期末配当の権利落ち日が同じ 2018/12/26。
+    # Yahoo のその日の配当 38 円は分割前の金額のまま
+    periods = [FiscalPeriod(end=date(2016 + k, 12, 31), start=date(2016 + k, 1, 1), eps=100 + k, bps=1000 + 50 * k,
+                            dps=d, shares=sh, net_income=1e9, total_assets=2e10, equity_ratio=50, roe=10)
+               for k, (d, sh) in enumerate([(33, 11_150_000), (36, 11_150_000), (38, 11_150_000), (20, 22_300_000), (21, 22_300_000)])]
+    yahoo = [(date(2016, 12, 28), 16.5), (date(2017, 12, 27), 18.0), (date(2018, 12, 26), 38.0),
+             (date(2019, 12, 27), 20.0), (date(2020, 12, 29), 21.0)]
+    h = merge_reports([AnnualReport(doc_id="r", periods=periods)], [(date(2018, 12, 26), 2.0)], yahoo)
+    assert [p.dps for p in h.periods] == pytest.approx([16.5, 18, 19, 20, 21])
+    assert evaluate_stage2(h).dividend_cuts == []
