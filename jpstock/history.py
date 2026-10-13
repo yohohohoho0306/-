@@ -149,7 +149,15 @@ def _score(values: list[Optional[float]]) -> float:
     return total
 
 
-def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_date: Optional[date]) -> str:
+def _yahoo_fy_dividend(p: FiscalPeriod, dividends: list[tuple[date, float]]) -> Optional[float]:
+    """Yahoo の配当履歴（分割調整後）から、その期の年間配当（権利落ち日が期中のもの）の合計."""
+    start = p.start or (p.end - timedelta(days=365))
+    total = sum(v for d, v in dividends if start <= d <= p.end)
+    return total or None
+
+
+def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_date: Optional[date],
+                           dividends: Optional[list[tuple[date, float]]] = None, later: float = 1.0) -> str:
     """分割した期 i の前後で、1 株配当がどう記載されているかを判断する.
 
     - restated:       有報で分割後の基準に修正済み（何もしない）
@@ -161,12 +169,22 @@ def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_
     nxt = merged[i + 1].dps if i + 1 < len(merged) else None
     has_interim = cur.interim_dps is not None and cur.interim_dps > 0 and cur.dps is not None
     options = ["before_interim", "restated"]
+    # Yahoo の配当（分割調整後）と比べられれば、前の期の配当が分割前の基準のままかを直接確かめる。
+    # later は、この系列の最後の期より後の分割（Yahoo の値はそれも調整済み）
+    yahoo = _yahoo_fy_dividend(prev, dividends) if dividends and prev.dps else None
+    if yahoo and abs(math.log(split)) >= math.log(1.4):
+        q = prev.dps / (yahoo * later)
+        if _closer_to_split(q, split):
+            options = ["before_interim"]
+        elif abs(math.log(q)) < 0.25:
+            return "restated"
     if has_interim:
         options.append("after_interim")
         if ex_date is not None and cur.start is not None:
             interim_record = _add_months(cur.start, 6) - timedelta(days=1)
             if ex_date + _EFFECTIVE_LAG > interim_record:
-                options.remove("before_interim")
+                if "before_interim" in options:
+                    options.remove("before_interim")
             else:
                 options.remove("after_interim")
 
@@ -180,7 +198,8 @@ def _choose_dividend_basis(merged: list[FiscalPeriod], i: int, split: float, ex_
     return min(options, key=lambda o: (_score(series(o)), o != "before_interim"))
 
 
-def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple[date, float]]] = None) -> History:
+def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple[date, float]]] = None,
+                  known_dividends: Optional[list[tuple[date, float]]] = None) -> History:
     """報告書（新しい順）をつないで History を作る.
 
     known_splits は Yahoo Finance の分割履歴（権利落ち日, 倍率）。株式数の変化が分割の倍率から
@@ -251,10 +270,15 @@ def merge_reports(reports: list[AnnualReport], known_splits: Optional[list[tuple
         "after_interim": "以前の期の1株配当と、当期の中間配当を割り戻した（期の途中の分割）",
     }
     splits: list[tuple[date, float]] = []
+    later = 1.0  # 系列の最後の期末より後の分割（Yahoo の配当はそれも調整済み）
+    if merged:
+        for d, r in known:
+            if d + _EFFECTIVE_LAG > merged[-1].end and r > 0:
+                later *= r
     for i, split, ex_date, how in sorted(found, reverse=True):  # 新しい分割から処理する
         prev, cur = merged[i - 1], merged[i]
         splits.append((cur.end, split))
-        basis = _choose_dividend_basis(merged, i, split, ex_date)
+        basis = _choose_dividend_basis(merged, i, split, ex_date, known_dividends, later)
         notes.append(f"{cur.end} 期に株式分割・併合（{split:g} 倍、{how}）を検出。{labels[basis]}")
         if basis != "restated":
             for j in range(i):

@@ -204,42 +204,65 @@ def fetch_prices(
     return prices
 
 
-def fetch_split_history(
+@dataclass
+class Actions:
+    """Yahoo Finance の分割履歴と配当履歴（配当は分割調整後、権利落ち日ごと）."""
+
+    splits: list[tuple[date, float]] = field(default_factory=list)
+    dividends: list[tuple[date, float]] = field(default_factory=list)
+
+
+def fetch_actions(
     codes: list[str],
     log: Callable[[str], None] = lambda msg: print(msg, file=sys.stderr),
     cache_dir: Optional[Path] = None,
     pause: float = 0.3,
     retries: int = 5,
     sleep: Callable[[float], None] = time.sleep,
-) -> dict[str, list[tuple[date, float]]]:
-    """Yahoo Finance から全期間の分割・併合の履歴（権利落ち日, 倍率）を取得する（要ネットワーク）."""
+) -> dict[str, Actions]:
+    """Yahoo Finance から全期間の分割・併合と配当の履歴を取得する（要ネットワーク）.
+
+    分割は（権利落ち日, 倍率）、配当は（権利落ち日, 分割調整後の1株配当）。
+    """
     import yfinance as yf
 
-    path = Path(cache_dir) / f"splits_{date.today().isoformat()}.json" if cache_dir else None
+    path = Path(cache_dir) / f"actions_{date.today().isoformat()}.json" if cache_dir else None
     cached = _load_json(path)
-    out: dict[str, list[tuple[date, float]]] = {
-        c: [(date.fromisoformat(d), r) for d, r in v] for c, v in cached.items()
+    out: dict[str, Actions] = {
+        c: Actions(splits=[(date.fromisoformat(d), r) for d, r in v["splits"]],
+                   dividends=[(date.fromisoformat(d), r) for d, r in v["dividends"]])
+        for c, v in cached.items()
     }
     todo = [c for c in codes if c not in out]
     for n, code in enumerate(todo, 1):
         if n % 50 == 0:
-            log(f"  分割履歴 {n}/{len(todo)} 銘柄")
+            log(f"  分割・配当の履歴 {n}/{len(todo)} 銘柄")
         for attempt in range(retries + 1):
             try:
-                series = yf.Ticker(f"{code}.T").splits
+                frame = yf.Ticker(f"{code}.T").actions
             except Exception as exc:  # noqa: BLE001 - 取れなければ株式数の変化だけで判定する
                 text = f"{type(exc).__name__} {exc}".lower()
                 if ("ratelimit" in text or "too many requests" in text) and attempt < retries:
                     sleep(30 * 2 ** attempt)
                     continue
                 break
-            if series is None:  # 東証に無い銘柄（札証・福証のみなど）は None が返る
-                series = {}
-            out[code] = [(idx.date(), float(r)) for idx, r in series.items() if r > 0 and r != 1]
-            cached[code] = [[d.isoformat(), r] for d, r in out[code]]
+            acts = Actions()
+            if frame is not None and len(frame):  # 東証に無い銘柄（札証・福証のみなど）は空
+                if "Stock Splits" in frame:
+                    acts.splits = [(idx.date(), float(r)) for idx, r in frame["Stock Splits"].items() if r > 0 and r != 1]
+                if "Dividends" in frame:
+                    acts.dividends = [(idx.date(), float(v)) for idx, v in frame["Dividends"].items() if v > 0]
+            out[code] = acts
+            cached[code] = {"splits": [[d.isoformat(), r] for d, r in acts.splits],
+                            "dividends": [[d.isoformat(), v] for d, v in acts.dividends]}
             break
         if n % 20 == 0:
             _save_json(path, cached)
         sleep(pause)
     _save_json(path, cached)
     return out
+
+
+def fetch_split_history(codes: list[str], **kw) -> dict[str, list[tuple[date, float]]]:
+    """Yahoo Finance から全期間の分割・併合の履歴（権利落ち日, 倍率）を取得する（要ネットワーク）."""
+    return {c: a.splits for c, a in fetch_actions(codes, **kw).items()}

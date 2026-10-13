@@ -25,7 +25,7 @@ from typing import Callable, Optional
 
 from .edinet import Company, EdinetClient, EdinetError
 from .history import SPLIT_RATIOS, History, merge_reports
-from .prices import PriceInfo, fetch_prices, fetch_split_history, load_prices_csv
+from .prices import Actions, PriceInfo, fetch_actions, fetch_prices, load_prices_csv
 from .ricky import (
     Criteria, Stage1, Stage2, Stage3,
     evaluate_stage1, evaluate_stage2, evaluate_stage3, is_financial,
@@ -180,7 +180,7 @@ def run_pipeline(
     stage2_all: bool = False,
     criteria: Criteria = Criteria(),
     log: Callable[[str], None] = _log,
-    split_source: Optional[Callable[[list[str]], dict[str, list[tuple[date, float]]]]] = None,
+    split_source: Optional[Callable[[list[str]], dict]] = None,
 ) -> list[ScreenRow]:
     companies = client.companies()
     if codes:
@@ -260,8 +260,12 @@ def run_pipeline(
                 reports.append(client.annual_report(doc["docID"]))
             except (EdinetError, ValueError) as exc:
                 row.errors.append(f"{years}年前の有報取得失敗: {exc}")
-        known = split_history.get(row.company.sec_code) or (row.price.splits if row.price else [])
-        row.history = rebase_history(merge_reports(reports, known), *later_split_factors(row.report, row.price)[:2])
+        # split_source は {コード: Actions}（分割・配当の履歴）か {コード: 分割の一覧} を返す
+        acts = split_history.get(row.company.sec_code)
+        known, dividends = (acts.splits, acts.dividends) if isinstance(acts, Actions) else (acts or [], [])
+        known = known or (row.price.splits if row.price else [])
+        row.history = rebase_history(merge_reports(reports, known, dividends),
+                                     *later_split_factors(row.report, row.price)[:2])
         row.stage2 = evaluate_stage2(row.history, criteria)
         row.stage3 = evaluate_stage3(
             row.report.dividend_policy,
@@ -487,7 +491,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         price_cache = Path(args.cache_dir).parent / "prices"
         price_source = lambda codes: fetch_prices(codes, cache_dir=price_cache)  # noqa: E731
-        split_source = lambda codes: fetch_split_history(codes, cache_dir=price_cache)  # noqa: E731
+        split_source = lambda codes: fetch_actions(codes, cache_dir=price_cache)  # noqa: E731
 
     try:
         rows = run_pipeline(client, price_source, as_of, codes=args.codes,

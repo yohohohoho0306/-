@@ -729,3 +729,32 @@ def test_blank_dividend_is_treated_as_no_dividend_when_other_periods_have_one():
     assert any("無配とみなした" in n for n in h.notes)
     s2 = evaluate_stage2(h)
     assert s2.dividend_cuts == [] and s2.dividend_suspended == [] and "1株配当欠損" not in s2.missing
+
+
+def test_yahoo_adjusted_dividends_decide_whether_dividends_were_restated():
+    # 日本電計型: 1→1.5 の分割と同じ期に大きく増配。配当のつながりだけでは「修正済み」と誤る
+    report = AnnualReport(doc_id="r", periods=[
+        fp(2019, 100, 1000, 45, 10_000_000), fp(2020, 105, 1050, 48, 10_000_000), fp(2021, 110, 1100, 50, 10_000_000),
+        fp(2022, 80, 800, 60, 15_000_000), fp(2023, 85, 850, 62, 15_000_000),
+    ])
+    known = [(date(2021, 12, 29), 1.5)]
+    guessed = merge_reports([report], known)
+    assert guessed.periods[2].dps == 50  # つながりだけだと 50→60 を自然とみて割り戻さない
+    # Yahoo の分割調整後の配当（2021/3 期は 50 / 1.5）があれば、分割前の基準のままと分かる
+    yahoo = [(date(2020, 9, 28), 16.0), (date(2021, 3, 29), 50 / 1.5 - 16.0)]
+    h = merge_reports([report], known, yahoo)
+    assert h.periods[2].dps == pytest.approx(50 / 1.5)
+    assert [p.dps for p in h.periods][:2] == pytest.approx([30, 32])
+
+
+def test_fetch_actions_reads_splits_and_dividends(tmp_path, monkeypatch):
+    idx = pd.to_datetime(["2021-03-29", "2021-12-29"]).tz_localize("Asia/Tokyo")
+    frame = pd.DataFrame({"Dividends": [33.3, 0.0], "Stock Splits": [0.0, 1.5]}, index=idx)
+    fake = type("YF", (), {"Ticker": lambda self, t: type("T", (), {"actions": frame})()})()
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    from jpstock.prices import fetch_actions
+    acts = fetch_actions(["9908"], cache_dir=tmp_path, log=lambda m: None, sleep=lambda s: None)
+    assert acts["9908"].splits == [(date(2021, 12, 29), 1.5)]
+    assert acts["9908"].dividends == [(date(2021, 3, 29), 33.3)]
+    again = fetch_actions(["9908"], cache_dir=tmp_path, log=lambda m: None, sleep=lambda s: None)
+    assert again["9908"].dividends == acts["9908"].dividends
