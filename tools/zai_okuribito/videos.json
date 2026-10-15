@@ -1,0 +1,24 @@
+{
+  "note": "ダイヤモンドZAi の YouTube「億り人の必勝法」（ザイの資産形成塾）。id が null の回は fetch_transcripts.py --discover で YouTube の検索から埋める。タイトルは検索結果で見えたもの（2026-10-15 時点）",
+  "series": [
+    {"vol": 1, "investor": "かんち", "id": "B4ELzEpAaFw", "title": "高配当株＆優待株で８億円つくった元消防士・かんちさんの上がる株の見つけ方"},
+    {"vol": 2, "investor": "kenmo", "id": "cPp4ex_wAZk", "title": "元手300万円から追加入金ゼロで3億円以上！元サラリーマン投資家kenmoさんの勝ちワザを直撃！"},
+    {"vol": 3, "investor": "立川一", "id": "Cy_Wj8bckR0", "title": "「増配の実績」だけ見て資産3.8億円！立川一さんの「資産」も「配当」も増やすワザ"},
+    {"vol": 4, "investor": "ようこりん", "id": null, "title": "優待株を安い時に買って資産1.5億円超！“出金投資家”ようこりんの優待株投資術"},
+    {"vol": 5, "investor": null, "id": null, "title": null},
+    {"vol": 6, "investor": "www9945", "id": "HegHdr61y4A", "title": "高配当株で土台を固め主力６銘柄に集中！年収３００万円で資産11億円を達成したwww9945さんの投資術"},
+    {"vol": 7, "investor": null, "id": null, "title": null},
+    {"vol": 8, "investor": "ポール・サイ", "id": null, "title": "生活費は抑えて投資に回し42歳でFIRE！台湾系アメリカ人が教える一生使えるお金の考え方"},
+    {"vol": 9, "investor": "DAIBOUCHOU", "id": null, "title": "資産10億円を再び達成！DAIBOUCHOUさんの「割安×成長×訳アリ」投資法"},
+    {"vol": 10, "investor": "ヘム", "id": null, "title": "増配は神！6億円投資家ヘムさんが伝授する「株価が上がる増配株」3つの条件"},
+    {"vol": 11, "investor": "ナスダッ子", "id": "6I8R4AhSH48", "title": "55歳からの米国株投資で4億円！ナスダッ子さんの銘柄選び3つの極意"},
+    {"vol": 12, "investor": "reforemer21", "id": "iOPqiuwHsaM", "title": "元手550万円から資産26億円に！割安な中小型の成長株に投資して成功した会社員投資家reforemer21さんの投資術"},
+    {"vol": 13, "investor": "某哲也", "id": "ngjItXQGuEY", "title": "麻雀とパチンコで鍛えた「期待値」が武器！金融資産5億円の某哲也さんが明かす、手間をかけずに利益を狙う「お昼寝投資法」"},
+    {"vol": 14, "investor": null, "id": null, "title": null},
+    {"vol": 15, "investor": "Ricky", "id": "_-oDwfCiOkI", "title": "年間配当収入800万円超！増配株投資で配当金を増やし続け、FIREを実現したRickyさんの投資術"}
+  ],
+  "extra": [
+    {"investor": "編集部の解説（3人）", "id": "D5K-NpTGAkw", "title": "【株で1億円作った３人の勝ちワザ】億り人の必勝法を編集部員が解説！【ザイ26年1月号】"},
+    {"investor": "編集部の解説（4人）", "id": "5mRGGDWYJ-w", "title": "『株で１億円をつくるワザ』会社員でFIREも！株で資産１億円をつくった勝ち組のワザを大公開！ザイ25年5月号"}
+  ]
+}
