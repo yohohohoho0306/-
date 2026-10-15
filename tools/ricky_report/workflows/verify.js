@@ -1,7 +1,7 @@
 export const meta = {
   name: 'ricky-verify',
   description: '通過銘柄の数値・配当方針・テーマ性を有報の原本で確かめて反証役が点検し、判定が変わりうる不通過銘柄の不合格理由を確かめる',
-  whenToUse: 'prepare_verify.py で passers_N.json / fragile_N.json を作った後。args = {dir, passers: [N...], fragile: [N...]}',
+  whenToUse: 'prepare_verify.py で passers_N.json / fragile_N.json を作った後。args = {dir, repo, passers: [N...], fragile: [N...]}',
   phases: [
     { title: 'Passers', detail: '通過銘柄の数値・配当方針・テーマ性を確認（バッチごと）' },
     { title: 'Skeptic', detail: 'テーマ性と配当方針の主張を反証の立場で点検' },
@@ -10,10 +10,12 @@ export const meta = {
 }
 
 // 2026-10-13 の実行（research/runs/2026-10-13.md）で使ったワークフローを、次回も使えるように整理したもの。
-// 実行: Workflow({ scriptPath: 'tools/ricky_report/workflows/verify.js', args: { dir: '<絶対パス>', passers: [0, 1], fragile: [0] } })
+// 実行: Workflow({ scriptPath: 'tools/ricky_report/workflows/verify.js', args: { dir: '<絶対パス>', repo: '<リポジトリの絶対パス>', passers: [0, 1], fragile: [0] } })
+// 初めて使うときは passers: [0], fragile: [] の1バッチで試し、結果の形を確かめてから残りを流す。
 // 結果は collect_verify.py で journal.jsonl から research/data/<日付>/verify.json にまとめる。
 
 const DIR = args.dir
+const REPO = args.repo || '/home/user/-'  // リポジトリの場所（有報のキャッシュ .cache/edinet を読む）
 const PASSERS = args.passers || []
 const FRAGILE = args.fragile || []
 
@@ -28,7 +30,7 @@ const COMMON = `
 ## 調べ方（前回わかったこと）
 - 一次資料は有報の原本。PDF は https://disclosure2dl.edinet-fsa.go.jp/searchdocument/pdf/<書類番号>.pdf で取れる（yuho_doc_id が最新の有報）。
   ダウンロードは自分専用の新しい空フォルダに置き、テキスト化は python -I で pypdf を使う（ダウンロードしたフォルダの中でスクリプトを実行しない）。
-  XBRL の要素の値は /home/user/-/.cache/edinet/reports/<書類番号>.json.gz（gzip の JSON）にもある。
+  XBRL の要素の値は ${REPO}/.cache/edinet/reports/<書類番号>.json.gz（gzip の JSON）にもある。
 - 古い期の確認には、4〜5年前の有報（script_notes に書類番号が出る）を使う。
 - irbank.net・会社の IR サイトはこの環境から開けないことが多い。Web 検索はセッション全体で上限（200回）があるので、使うなら絞って使う。
 - 数値は推測で埋めない。確認できない項目は「未確認」。読んだ資料（URL や書類番号とページ）を必ず記録する。

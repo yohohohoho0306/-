@@ -79,6 +79,7 @@ python -m jpstock 7203 6758 --chart chart.png --period 1y
 export EDINET_API_KEY=...        # EDINET API v2 のキー（無料登録）。チャット等に貼らないこと
 python -m jpstock.screen --codes 7203 1911   # まず数銘柄で動作確認
 python -m jpstock.screen                     # 全上場会社（初回は数時間）
+python tools/ricky_report/run_all.py --as-of YYYY-MM-DD   # 全上場会社＋10期の系列（レポートとノートまで作るときはこちら）
 ```
 
 出力（`results/`）:
@@ -130,6 +131,7 @@ python -m jpstock.screen                     # 全上場会社（初回は数時
 gzip で保存する。取り出し方を直しても書類を取り直さずに計算し直せる。
 
 調査の結果と次回の続け方は `research/` にまとめてある（Obsidian ではこのリポジトリのフォルダを保管庫として開く）。
+2026-10-13 時点では、これらはブランチ `claude/dividend-increase-screening-k08eyg` にある。
 
 - [調査ノートの入口](research/INDEX.md): 最新のレポート、銘柄ごとのノート、次回の進め方、費用と時間の目安
 - [tools/ricky_report の道具](tools/ricky_report/README.md): 全社の判定・前回との差分・確認の入力づくり・レポートとノートの作成

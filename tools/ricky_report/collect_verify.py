@@ -1,9 +1,12 @@
 """ワークフロー（workflows/verify.js）の journal.jsonl から確認結果を集め、verify.json にまとめる.
 
-    python tools/ricky_report/collect_verify.py research/data/<日付>/verify.json <journal.jsonl> [...]
+    python tools/ricky_report/collect_verify.py research/data/<日付>/verify.json <journal.jsonl> [...] \
+        [--selected <作業フォルダ>/selected.json]
 
-journal は ~/.claude/projects/<プロジェクト>/<セッション>/subagents/workflows/<runId>/journal.jsonl。
-同じ銘柄が複数あれば、後に渡した journal の結果を優先する。出力が既にあれば、その内容に上書きで足す。
+journal は ~/.claude/projects/<プロジェクト>/<セッションID>/subagents/workflows/<runId>/journal.jsonl
+（runId は Workflow ツールの結果に出る wf_… ）。同じ銘柄が複数あれば、後に渡した journal の結果を優先する。
+出力が既にあれば、その内容に上書きで足す。--selected を付けると、確かめた不通過銘柄と直近の決算期末を
+同じフォルダの checked.json に書く（次回 prepare_verify.py --skip-checked で使う）。
 """
 
 from __future__ import annotations
@@ -14,7 +17,13 @@ from pathlib import Path
 
 
 def main() -> int:
-    out, journals = Path(sys.argv[1]), sys.argv[2:]
+    argv = sys.argv[1:]
+    selected = None
+    if "--selected" in argv:
+        i = argv.index("--selected")
+        selected = json.loads(Path(argv[i + 1]).read_text(encoding="utf-8"))
+        argv = argv[:i] + argv[i + 2:]
+    out, journals = Path(argv[0]), argv[1:]
     research, review, fragile = {}, {}, {}
     if out.exists():
         old = json.loads(out.read_text(encoding="utf-8"))
@@ -47,6 +56,14 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"research {len(research)}・review {len(review)}・fragile {len(fragile)} → {out}")
+    if selected is not None:
+        path = out.parent / "checked.json"
+        checked = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"run": out.parent.name, "fragile": {}}
+        for code, st in fragile.items():
+            if code in selected.get("fragile", {}):
+                checked["fragile"][code] = {"latest_period_end": selected["fragile"][code], "overall": st.get("overall", "")}
+        path.write_text(json.dumps(checked, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"checked.json: 不通過の確認 {len(checked['fragile'])} 銘柄 → {path}")
     return 0
 
 

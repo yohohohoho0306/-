@@ -2,9 +2,10 @@
 
     python tools/ricky_report/diff_passers.py results/full research/data/2026-10-13/passers.json
 
-「新しく通過」「続けて通過」「脱落（今回の判定）」を出す。新しく通過した銘柄だけ、
-テーマ性・配当方針を調べ直せばよい（続けて通過した銘柄は前回の調査を再利用し、
-新しい有報で配当方針が変わっていないかだけ確かめる）。
+「新しく通過」「続けて通過」「脱落（今回の判定）」を出す。新しく通過した銘柄と、続けて通過して
+新しい有報が出た銘柄は、テーマ性・配当方針を調べ直す（prepare_verify.py --only-new がこの2つを選ぶ）。
+新しい有報が出た銘柄には、有報の配当政策を機械的に見た記載（累進・DOE・DOE の数値）が前回と比べて
+変わったかも出す（変わっていれば配当方針の表記を見直す）。
 """
 
 from __future__ import annotations
@@ -26,10 +27,19 @@ def main() -> int:
     print(f"\n## 新しく通過（{len(now - before)}）— テーマ性・配当方針を調べる")
     for c in sorted(now - before):
         print(f"- {c} {rows[c]['銘柄名']}（{rows[c]['業種']}）")
-    print(f"\n## 続けて通過（{len(now & before)}）— 前回の調査を再利用。新しい有報が出ていれば配当方針だけ確かめる")
+    print(f"\n## 続けて通過（{len(now & before)}）— 新しい有報が無ければ前回の調査を再利用。新しい有報があればテーマ性・配当方針を調べ直す")
     for c in sorted(now & before):
-        new_fy = rows[c]["直近決算期末"] != prev[c]["latest_period_end"]
-        print(f"- {c} {rows[c]['銘柄名']}" + ("（新しい有報あり: " + rows[c]["直近決算期末"] + "）" if new_fy else ""))
+        r, q = rows[c], prev[c]
+        line = f"- {c} {r['銘柄名']}"
+        if r["直近決算期末"] != q["latest_period_end"]:
+            line += f"（新しい有報あり: {r['直近決算期末']}"
+            if "yuho_doe" in q:
+                was = (q["yuho_progressive"], q["yuho_doe"], q["yuho_doe_value"])
+                cur = (bool(r["累進"]), bool(r["DOE"]), r["DOE数値"])
+                line += "。配当政策の記載: " + ("変化なし" if was == cur else
+                                              f"変化あり（累進 {was[0]}→{cur[0]}、DOE {was[1]}→{cur[1]}、数値 {was[2] or '-'}→{cur[2] or '-'}）")
+            line += "）"
+        print(line)
     print(f"\n## 脱落（{len(before - now)}）— 今回の判定と落ちた条件")
     for c in sorted(before - now):
         r = rows.get(c)

@@ -6,8 +6,8 @@
         --out research/ricky_screening_full_YYYY-MM-DD.md
 
 表（通過銘柄・金融・印・不通過・業種・件数・テーマ性の根拠）は判定結果と確認結果から作る。
-文章のパーツ（SUMMARY・RECONCILE・PASSED_INTRO・PASSED_CAUTIONS・FRAGILE・INDUSTRY・SPLITS・FIXES・LIMITS・
-SOURCES・EVIDENCE_INTRO）は --parts のフォルダに <NAME>.md（または .txt）として、実行ごとに書く（無ければ「未作成」と入る）。
+文章のパーツ（SUMMARY・RECONCILE・PASSED_INTRO・MARKS_NOTE・PASSED_CAUTIONS・FRAGILE・INDUSTRY・SPLITS・FIXES・
+LIMITS・SOURCES・EVIDENCE_INTRO）は --parts のフォルダに <NAME>.md（または .txt）として、実行ごとに書く（無ければ「未作成」と入る）。
 前回の文章は前回のレポートの各章にあるので、それを写して今回の事実に合わせて直すとよい。
 """
 import argparse
@@ -76,9 +76,11 @@ def main():
     marks_md = [f"- **★（BPS毎期増加＋DOE採用＋PBR 0.8〜1.2倍）: {len(star)}銘柄**"]
     marks_md += [f"  - {label(c)}" for c in star] or ["  - 該当なし"]
     marks_md += [f"- **☆（3条件のうち2つ）: {len(half)}銘柄** — " + "、".join(f"{rows[c]['銘柄名']}（{'DOE' if B.doe_adopted(c) else 'PBR ' + B.f(rows[c]['PBR']) + '倍'}）" for c in half)]
-    marks_md += ["", "DOE 採用の有無は、有報の「配当政策」と会社の資料（確認できた範囲）による。PBR は 2026-10-13 終値ベース。",
-                 "", "DOE の書き方は会社によって違う。下限（例：日本信号 2.0%以上）、目安（西部電機 4.0%）、将来の目標（ツムラ 2031年度 5%、ヤマタネ 2028/3期 3.0%）、配当性向と比べて高い方（木村化工機・第一実業）があり、"
-                 "ヤマダコーポレーション（★）と日本新薬（☆）は DOE を指標に使うと書いているが、水準の数値は示していない。DOE の数値は 3-1 の表の「配当方針」の欄。"]
+    price_day = Counter(rows[c]["株価日付"] for c in passed).most_common(1)[0][0] if passed else a.as_of
+    marks_md += ["", f"DOE 採用の有無は、有報の「配当政策」と会社の資料（確認できた範囲）による。PBR は {price_day} 終値ベース。"]
+    # DOE の書き方の例など、実行ごとの説明はパーツ MARKS_NOTE に書く
+    if not part("MARKS_NOTE").endswith("は未作成）"):
+        marks_md += ["", part("MARKS_NOTE")]
 
     # 第2段階の不合格理由の集計
     fails = [r for r in rows.values() if r["判定"] == "第2段階 不通過"]

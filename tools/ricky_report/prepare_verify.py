@@ -1,12 +1,15 @@
 """エージェントに確かめてもらう銘柄の入力 JSON（passers_N.json・fragile_N.json）を作る.
 
-    python tools/ricky_report/prepare_verify.py results/full work/verify \
-        [--only-new research/data/2026-10-13/passers.json] [--batch 8]
+    python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> \
+        [--only-new research/data/<前回>/passers.json] [--skip-checked research/data/*/checked.json] [--batch 8]
 
-- passers_N.json: 通過銘柄（--only-new を付けると、前回の passers.json に無い銘柄だけ）。
+- passers_N.json: 通過銘柄。--only-new を付けると、前回の passers.json にあって直近の決算期が変わっていない銘柄
+  （前回の調査をそのまま使える銘柄）を除く。新しく通過した銘柄と、続けて通過して新しい有報が出た銘柄が残る。
   数値・10期の系列・スクリプトの注記・有報の配当政策の本文が入る。workflows/verify.js が読む。
-- fragile_N.json: 第2段階で落ちた銘柄のうち、分割・併合・変則決算・会計基準の変更・報告書の
-  つなぎ目などの調整が不合格理由に関係しうるもの（調整の誤りで落ちていないかを確かめる）。
+- fragile_N.json: 第2段階で落ちた銘柄のうち、分割・併合・変則決算・会計基準の変更・報告書のつなぎ目などの
+  調整が不合格理由に関係しうるもの（調整の誤りで落ちていないかを確かめる）。--skip-checked を付けると、
+  前回までに確かめ（checked.json）、直近の決算期が変わっていない銘柄を除く。
+- selected.json: 選んだ銘柄と直近の決算期末。collect_verify.py --selected に渡すと checked.json ができる。
 """
 
 from __future__ import annotations
@@ -75,7 +78,8 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("results")
     p.add_argument("out")
-    p.add_argument("--only-new", help="前回の passers.json。そこに無い通過銘柄だけを調べる")
+    p.add_argument("--only-new", help="前回の passers.json。そこにあって直近の決算期が同じ通過銘柄を除く")
+    p.add_argument("--skip-checked", nargs="*", default=[], help="research/data/*/checked.json。確認済みの不通過銘柄を除く")
     p.add_argument("--batch", type=int, default=8)
     args = p.parse_args()
 
@@ -83,15 +87,32 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     rows = {r["コード"]: r for r in csv.DictReader(open(max(res.glob("ricky_all_*.csv")), encoding="utf-8-sig"))}
     series = json.loads((res / "series.json").read_text(encoding="utf-8"))
-    known = set(json.loads(Path(args.only_new).read_text(encoding="utf-8"))["stocks"]) if args.only_new else set()
+    prev = json.loads(Path(args.only_new).read_text(encoding="utf-8"))["stocks"] if args.only_new else {}
+    checked = {}
+    for f in args.skip_checked:
+        checked.update(json.loads(Path(f).read_text(encoding="utf-8")).get("fragile", {}))
 
-    passers = [stock_entry(r, series[c]) for c, r in rows.items()
-               if r["判定"] == "通過" and c in series and c not in known]
-    fragiles = [stock_entry(r, series[c]) for c, r in rows.items() if c in series and fragile(r, series[c])]
+    def reusable(c):  # 前回調べて、その後に新しい有報が出ていない通過銘柄
+        return c in prev and prev[c]["latest_period_end"] == rows[c]["直近決算期末"]
+
+    passer_codes = [c for c, r in rows.items() if r["判定"] == "通過" and c in series and not reusable(c)]
+    fragile_codes = [c for c, r in rows.items() if c in series and fragile(r, series[c])
+                     and not (c in checked and checked[c]["latest_period_end"] == r["直近決算期末"])]
+    passers = [stock_entry(rows[c], series[c]) for c in passer_codes]
+    fragiles = [stock_entry(rows[c], series[c]) for c in fragile_codes]
     nb = write_batches(passers, out, "passers", args.batch)
     nf = write_batches(fragiles, out, "fragile", args.batch)
-    print(f"passers {len(passers)} 銘柄 → {nb} バッチ、fragile {len(fragiles)} 銘柄 → {nf} バッチ（{out}）")
-    print("workflows/verify.js に args = {dir: '<この出力先の絶対パス>', passers: [0..], fragile: [0..]} を渡す")
+    (out / "selected.json").write_text(json.dumps(
+        {"passers": {c: rows[c]["直近決算期末"] for c in passer_codes},
+         "fragile": {c: rows[c]["直近決算期末"] for c in fragile_codes}}, ensure_ascii=False, indent=1), encoding="utf-8")
+    new_ones = [c for c in passer_codes if c not in prev]
+    print(f"passers {len(passers)} 銘柄（新しく通過 {len(new_ones)}・続けて通過で新しい有報 {len(passers) - len(new_ones)}）"
+          f" → {nb} バッチ、fragile {len(fragiles)} 銘柄 → {nf} バッチ（{out}）")
+    skipped = sum(1 for c, r in rows.items() if c in series and fragile(r, series[c])) - len(fragiles)
+    if skipped:
+        print(f"確認済みで除いた不通過銘柄: {skipped}")
+    print("workflows/verify.js に args = {dir: '<この出力先の絶対パス>', repo: '<リポジトリの絶対パス>', "
+          "passers: [0..], fragile: [0..]} を渡す")
     return 0
 
 

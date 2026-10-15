@@ -10,6 +10,9 @@ Rickyさん流の増配株3段階スクリーニングを、EDINET の有価証�
 
 Obsidian では、このリポジトリのフォルダを保管庫（vault）として開く（開き方は [次回の進め方](next-run.md) の最後）。次に作業するときは、まず [次回の進め方](next-run.md) を読む。
 
+> [!IMPORTANT]
+> このノートと道具は、ブランチ `claude/dividend-increase-screening-k08eyg` にある（2026-10-13 時点。既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` にはまだ無い）。新しいセッションや clone では、最初にこのブランチに切り替える。
+
 ## 最新の結果（2026-10-13）
 
 - [全社版レポート（2026-10-13）](ricky_screening_full_2026-10-13.md): 通過61銘柄の表・印・テーマ性の根拠・第2段階で落ちた理由・業種の偏り・スクリプトの修正点。結果を見るならここ。
@@ -26,13 +29,14 @@ Obsidian では、このリポジトリのフォルダを保管庫（vault）と
 
 ## 過去の記録
 
-- [手作業の調査（2026-10-12、IRBank）](ricky_screening_2026-10-12.md): 9銘柄。2026-10-13 の試し実行で突き合わせた相手。
+- [手作業の調査（2026-10-12、IRBank）](ricky_screening_2026-10-12.md): 84銘柄を調べ、9銘柄が通過。2026-10-13 の試し実行で突き合わせた相手。通過9銘柄は [passers.json](data/2026-10-12/passers.json) に最小限の形で記録した（銘柄ノートの判定の履歴に出る）。
 
 ## データ（JSON。Obsidian では一覧に出ない）
 
 - [passers.json](data/2026-10-13/passers.json): 2026-10-13 の通過銘柄の数値と表記。次回 `diff_passers.py` が「前回分」として読む。
 - [verify.json](data/2026-10-13/verify.json): エージェントの調査と反証の点検の結果（出典の URL・書類番号つき）。
-- [labels.json](data/2026-10-13/labels.json): 点検を踏まえて決めたテーマ性・DOE の表記。
+- [labels.json](data/2026-10-13/labels.json): 点検を踏まえて決めたテーマ性・DOE の表記と、ノートに出す補足・注意書き。
+- [checked.json](data/2026-10-13/checked.json): 確かめた不通過銘柄と、洗い出し（scan_anomalies.py）で出た銘柄の結果。次回の `--skip-checked` で使う。
 - `data/2026-10-13/parts/`: レポートの文章のパーツ（`assemble.py` で今のレポートを作り直せる）。
 
 Related: [README（スクリプトの使い方）](../README.md)

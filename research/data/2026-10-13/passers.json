@@ -22,8 +22,12 @@
    "dividend_cuts": [
     "2020-12-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "米国戸建住宅（海外住宅事業が最大の利益源。当期は減益）"
+   "theme": "米国戸建住宅（海外住宅事業が最大の利益源。当期は減益）",
+   "checked_on": "2026-10-13"
   },
   "1301": {
    "name": "極洋",
@@ -44,8 +48,12 @@
    "EPS_ratio": "2.50",
    "BPS_growth": "2.74",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE 3%以上（中計の目標）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "1847": {
    "name": "イチケン",
@@ -66,8 +74,12 @@
    "EPS_ratio": "2.10",
    "BPS_growth": "2.89",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE 4%程度（配当性向40%程度と並記）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "1828": {
    "name": "田辺工業",
@@ -88,8 +100,12 @@
    "EPS_ratio": "2.94",
    "BPS_growth": "2.26",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "化学・電子材プラントの設備工事（半導体関連を含むが金額は非開示）"
+   "theme": "化学・電子材プラントの設備工事（半導体関連を含むが金額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "1798": {
    "name": "守谷商会",
@@ -110,8 +126,12 @@
    "EPS_ratio": "2.35",
    "BPS_growth": "2.40",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "未確認（国土強靭化・観光投資は業界環境の説明のみ）"
+   "theme": "未確認（国土強靭化・観光投資は業界環境の説明のみ）",
+   "checked_on": "2026-10-13"
   },
   "2112": {
    "name": "塩水港精糖",
@@ -134,8 +154,12 @@
    "dividend_cuts": [
     "2020-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "未確認（万博・インバウンドは増収要因の記載のみ）"
+   "theme": "未確認（万博・インバウンドは増収要因の記載のみ）",
+   "checked_on": "2026-10-13"
   },
   "2924": {
    "name": "イフジ産業",
@@ -158,8 +182,12 @@
    "dividend_cuts": [
     "2018-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "7849": {
    "name": "スターツ出版",
@@ -180,8 +208,12 @@
    "EPS_ratio": "6.09",
    "BPS_growth": "2.92",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "コンテンツIP（自社小説サイト発の書籍・コミック。映像化の押し上げは前期のみ）"
+   "theme": "コンテンツIP（自社小説サイト発の書籍・コミック。映像化の押し上げは前期のみ）",
+   "checked_on": "2026-10-13"
   },
   "4028": {
    "name": "石原産業",
@@ -204,8 +236,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3%",
    "policy": "累進：記載なし／DOE 3%以上（下限、中計期間中）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "4516": {
    "name": "日本新薬",
@@ -226,8 +262,12 @@
    "EPS_ratio": "2.53",
    "BPS_growth": "2.55",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOEを勘案（水準は非開示）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "4540": {
    "name": "ツムラ",
@@ -248,8 +288,12 @@
    "EPS_ratio": "2.10",
    "BPS_growth": "1.92",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "5%",
    "policy": "累進：記載なし／DOE 5%（2031年度の目標）",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "5363": {
    "name": "東京窯業",
@@ -272,8 +316,12 @@
    "dividend_cuts": [
     "2020-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "5356": {
    "name": "美濃窯業",
@@ -296,8 +344,12 @@
    "dividend_cuts": [
     "2020-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "5284": {
    "name": "ヤマウホールディングス",
@@ -320,8 +372,12 @@
    "dividend_cuts": [
     "2026-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認（国土強靭化は需要の下支えの記載のみ。当期は受注減で減収）"
+   "theme": "未確認（国土強靭化は需要の下支えの記載のみ。当期は受注減で減収）",
+   "checked_on": "2026-10-13"
   },
   "5285": {
    "name": "ヤマックス",
@@ -342,8 +398,12 @@
    "EPS_ratio": "10.10",
    "BPS_growth": "2.64",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "1%",
    "policy": "累進：記載なし／DOE 1%以上（下限）",
-   "theme": "公共土木・国土強靭化（土木用製品の営業利益+7.1%。テーマ別の寄与は非開示）"
+   "theme": "公共土木・国土強靭化（土木用製品の営業利益+7.1%。テーマ別の寄与は非開示）",
+   "checked_on": "2026-10-13"
   },
   "5288": {
    "name": "アジアパイルホールディングス",
@@ -364,8 +424,12 @@
    "EPS_ratio": "4.22",
    "BPS_growth": "1.79",
    "dividend_cuts": [],
-   "policy": "累進：あり／DOE 3.75%以上",
-   "theme": "大型建築・再開発向け基礎杭、ベトナムのインフラ整備"
+   "yuho_progressive": true,
+   "yuho_doe": true,
+   "yuho_doe_value": "3.75%",
+   "policy": "累進：あり／DOE 3.75%以上（5か年計画期間の目途）",
+   "theme": "大型建築・再開発向け基礎杭、ベトナムのインフラ整備",
+   "checked_on": "2026-10-13"
   },
   "5480": {
    "name": "日本冶金工業",
@@ -388,8 +452,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE 2.8%以上（下限）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "5930": {
    "name": "文化シヤッター",
@@ -410,8 +478,12 @@
    "EPS_ratio": "2.15",
    "BPS_growth": "1.83",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "防災・減災（止水製品）"
+   "theme": "防災・減災（止水製品）",
+   "checked_on": "2026-10-13"
   },
   "6332": {
    "name": "月島ホールディングス",
@@ -432,8 +504,12 @@
    "EPS_ratio": "8.37",
    "BPS_growth": "1.80",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3.5%",
    "policy": "累進：記載なし／DOE 3.5%以上（下限）",
-   "theme": "上下水道インフラ更新（水環境の営業利益58.05億円。当期は−5.4%）"
+   "theme": "上下水道インフラ更新（水環境の営業利益58.05億円。当期は−5.4%）",
+   "checked_on": "2026-10-13"
   },
   "6365": {
    "name": "電業社機械製作所",
@@ -454,8 +530,12 @@
    "EPS_ratio": "2.87",
    "BPS_growth": "1.90",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "6378": {
    "name": "木村化工機",
@@ -478,8 +558,12 @@
    "dividend_cuts": [
     "2023-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3%",
    "policy": "累進：記載なし／DOE 3%（配当性向35%と高い方）",
-   "theme": "原子力（福島第一原発の廃炉・六ヶ所の核燃料サイクル施設向け機器）"
+   "theme": "原子力（福島第一原発の廃炉・六ヶ所の核燃料サイクル施設向け機器）",
+   "checked_on": "2026-10-13"
   },
   "6246": {
    "name": "テクノスマート",
@@ -502,8 +586,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
-   "policy": "累進：記載なし／DOE 5%以上",
-   "theme": "未確認（車載電池向け塗工機は受注が大幅減）"
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "5%",
+   "policy": "累進：記載なし／DOE 5%以上（目標水準）",
+   "theme": "未確認（車載電池向け塗工機は受注が大幅減）",
+   "checked_on": "2026-10-13"
   },
   "6488": {
    "name": "ヨシタケ",
@@ -526,8 +614,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "6648": {
    "name": "かわでん",
@@ -548,8 +640,12 @@
    "EPS_ratio": "2.85",
    "BPS_growth": "1.68",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "都市再開発・データセンター・半導体工場向け配電制御設備（内訳は非開示）"
+   "theme": "都市再開発・データセンター・半導体工場向け配電制御設備（内訳は非開示）",
+   "checked_on": "2026-10-13"
   },
   "6741": {
    "name": "日本信号",
@@ -570,8 +666,12 @@
    "EPS_ratio": "3.60",
    "BPS_growth": "1.53",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "2%",
    "policy": "累進：記載なし／DOE 2.0%以上（下限）",
-   "theme": "鉄道インフラ更新・省力化（交通運輸インフラの利益51.85億円・+14.0%）"
+   "theme": "鉄道インフラ更新・省力化（交通運輸インフラの利益51.85億円・+14.0%）",
+   "checked_on": "2026-10-13"
   },
   "6989": {
    "name": "北陸電気工業",
@@ -592,8 +692,12 @@
    "EPS_ratio": "19.08",
    "BPS_growth": "2.40",
    "dividend_cuts": [],
-   "policy": "累進：記載なし／DOE 3.0%以上",
-   "theme": "未確認（AIデータセンター向け抵抗器は定性的な記載のみ。電子部品は減益）"
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3%",
+   "policy": "累進：記載なし／DOE 3.0%以上（配当性向35%目処とともに満たす）",
+   "theme": "未確認（AIデータセンター向け抵抗器は定性的な記載のみ。電子部品は減益）",
+   "checked_on": "2026-10-13"
   },
   "6144": {
    "name": "西部電機",
@@ -616,8 +720,12 @@
    "dividend_cuts": [
     "2020-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "4%",
    "policy": "累進：記載なし／DOE 4.0%目安",
-   "theme": "半導体・データセンター向け精密加工機、水門の電動化"
+   "theme": "半導体・データセンター向け精密加工機、水門の電動化",
+   "checked_on": "2026-10-13"
   },
   "6932": {
    "name": "遠藤照明",
@@ -640,8 +748,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "LED化の更新需要（業務用LED照明が本業。寄与額は非開示）"
+   "theme": "LED化の更新需要（業務用LED照明が本業。寄与額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "7203": {
    "name": "トヨタ自動車",
@@ -662,8 +774,12 @@
    "EPS_ratio": "2.44",
    "BPS_growth": "2.60",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "6392": {
    "name": "ヤマダコーポレーション",
@@ -686,8 +802,12 @@
    "dividend_cuts": [
     "2025-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOEの維持・向上（数値目標なし）",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "7994": {
    "name": "オカムラ",
@@ -708,8 +828,12 @@
    "EPS_ratio": "3.14",
    "BPS_growth": "2.09",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：あり／DOE：なし",
-   "theme": "オフィス移転・改装需要"
+   "theme": "オフィス移転・改装需要",
+   "checked_on": "2026-10-13"
   },
   "6291": {
    "name": "日本エアーテック",
@@ -732,8 +856,12 @@
    "dividend_cuts": [
     "2024-12-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "半導体・電子工業向けクリーンエアー機器（売上の約52%。利益は非開示）"
+   "theme": "半導体・電子工業向けクリーンエアー機器（売上の約52%。利益は非開示）",
+   "checked_on": "2026-10-13"
   },
   "8014": {
    "name": "蝶理",
@@ -756,8 +884,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
-   "policy": "累進：記載なし／DOE 3.5%以上",
-   "theme": "未確認"
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3.5%",
+   "policy": "累進：記載なし／DOE 3.5%以上（配当性向と併用。次期から純資産ベース）",
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "3023": {
    "name": "ラサ商事",
@@ -778,8 +910,12 @@
    "EPS_ratio": "2.45",
    "BPS_growth": "1.95",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "ポンプの部品・整備需要（保守で増益。官需・国土強靭化の寄与は一部）"
+   "theme": "ポンプの部品・整備需要（保守で増益。官需・国土強靭化の寄与は一部）",
+   "checked_on": "2026-10-13"
   },
   "8059": {
    "name": "第一実業",
@@ -800,8 +936,12 @@
    "EPS_ratio": "2.99",
    "BPS_growth": "2.34",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "4%",
    "policy": "累進：記載なし／DOE 4.0%（配当性向40%と高い方）",
-   "theme": "空港の地上支援機材・官公庁向け特殊車両（全社利益の1割未満）"
+   "theme": "空港の地上支援機材・官公庁向け特殊車両（全社利益の1割未満）",
+   "checked_on": "2026-10-13"
   },
   "9857": {
    "name": "英和",
@@ -824,8 +964,12 @@
    "dividend_cuts": [
     "2018-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "造船向け計測制御機器（増収要因の一つ。金額は非開示）"
+   "theme": "造船向け計測制御機器（増収要因の一つ。金額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "9882": {
    "name": "イエローハット",
@@ -846,8 +990,12 @@
    "EPS_ratio": "2.28",
    "BPS_growth": "1.97",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "9906": {
    "name": "藤井産業",
@@ -870,8 +1018,12 @@
    "dividend_cuts": [
     "2019-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "電気設備の更新需要（LED化・省エネ変圧器）、半導体関連向け販売"
+   "theme": "電気設備の更新需要（LED化・省エネ変圧器）、半導体関連向け販売",
+   "checked_on": "2026-10-13"
   },
   "9908": {
    "name": "日本電計",
@@ -892,8 +1044,12 @@
    "EPS_ratio": "2.36",
    "BPS_growth": "2.29",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "防衛・自動車開発投資向け計測機器（寄与額は非開示）"
+   "theme": "防衛・自動車開発投資向け計測機器（寄与額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "7463": {
    "name": "アドヴァン",
@@ -916,8 +1072,12 @@
    "dividend_cuts": [
     "2024-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "7570": {
    "name": "橋本総業ホールディングス",
@@ -938,8 +1098,12 @@
    "EPS_ratio": "2.10",
    "BPS_growth": "2.18",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認（データセンター・物流倉庫向け管材は定性的な記載のみ）"
+   "theme": "未確認（データセンター・物流倉庫向け管材は定性的な記載のみ）",
+   "checked_on": "2026-10-13"
   },
   "3355": {
    "name": "クリヤマホールディングス",
@@ -960,8 +1124,12 @@
    "EPS_ratio": "2.75",
    "BPS_growth": "2.67",
    "dividend_cuts": [],
-   "policy": "累進：記載なし／DOE 3.0%以上",
-   "theme": "未確認"
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "2.5% 3%",
+   "policy": "累進：記載なし／DOE 3.0%以上（中計で目指す目標）",
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "9997": {
    "name": "ベルーナ",
@@ -982,8 +1150,12 @@
    "EPS_ratio": "2.01",
    "BPS_growth": "1.80",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "1.5%",
    "policy": "累進：記載なし／DOE 1.5%以上（下限）",
-   "theme": "インバウンド・国内旅行（国内ホテル。セグメント利益には不動産売却益なども含む）"
+   "theme": "インバウンド・国内旅行（国内ホテル。セグメント利益には不動産売却益なども含む）",
+   "checked_on": "2026-10-13"
   },
   "8934": {
    "name": "サンフロンティア不動産",
@@ -1004,8 +1176,12 @@
    "EPS_ratio": "2.17",
    "BPS_growth": "2.78",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "インバウンド（ホテル運営の利益41.20億円・+25.1%。全社営業利益の約16%）"
+   "theme": "インバウンド（ホテル運営の利益41.20億円・+25.1%。全社営業利益の約16%）",
+   "checked_on": "2026-10-13"
   },
   "9057": {
    "name": "遠州トラック",
@@ -1026,8 +1202,12 @@
    "EPS_ratio": "3.56",
    "BPS_growth": "2.09",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "9233": {
    "name": "アジア航測",
@@ -1048,8 +1228,12 @@
    "EPS_ratio": "2.64",
    "BPS_growth": "2.18",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "国土強靭化・防災（国土保全コンサルの売上+20.6%。全社の営業利益は横ばい）"
+   "theme": "国土強靭化・防災（国土保全コンサルの売上+20.6%。全社の営業利益は横ばい）",
+   "checked_on": "2026-10-13"
   },
   "9305": {
    "name": "ヤマタネ",
@@ -1070,8 +1254,12 @@
    "EPS_ratio": "2.07",
    "BPS_growth": "1.90",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": true,
+   "yuho_doe_value": "3%",
    "policy": "累進：記載なし／DOE 3.0%（2028/3期の目標）",
-   "theme": "該当なし（コメ価格高騰による一時的な差益）"
+   "theme": "該当なし（コメ価格高騰による一時的な差益）",
+   "checked_on": "2026-10-13"
   },
   "9312": {
    "name": "ケイヒン",
@@ -1092,8 +1280,12 @@
    "EPS_ratio": "4.97",
    "BPS_growth": "2.16",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "9025": {
    "name": "鴻池運輸",
@@ -1116,8 +1308,12 @@
    "dividend_cuts": [
     "2021-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "インバウンド（空港地上業務。利益額は非開示、2025/12以降は中国路線の減便）"
+   "theme": "インバウンド（空港地上業務。利益額は非開示、2025/12以降は中国路線の減便）",
+   "checked_on": "2026-10-13"
   },
   "9368": {
    "name": "キムラユニティー",
@@ -1138,8 +1334,12 @@
    "EPS_ratio": "3.61",
    "BPS_growth": "2.05",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "9768": {
    "name": "いであ",
@@ -1160,8 +1360,12 @@
    "EPS_ratio": "3.03",
    "BPS_growth": "2.15",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "国土強靭化（防災・減災、インフラ維持管理の建設コンサル）"
+   "theme": "国土強靭化（防災・減災、インフラ維持管理の建設コンサル）",
+   "checked_on": "2026-10-13"
   },
   "9753": {
    "name": "アイエックス・ナレッジ",
@@ -1184,8 +1388,12 @@
    "dividend_cuts": [
     "2020-03-31"
    ],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認（DX需要は市況説明のみ）"
+   "theme": "未確認（DX需要は市況説明のみ）",
+   "checked_on": "2026-10-13"
   },
   "9799": {
    "name": "旭情報サービス",
@@ -1206,8 +1414,12 @@
    "EPS_ratio": "2.12",
    "BPS_growth": "1.75",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "未確認"
+   "theme": "未確認",
+   "checked_on": "2026-10-13"
   },
   "9739": {
    "name": "ＮＳＷ",
@@ -1228,8 +1440,12 @@
    "EPS_ratio": "2.18",
    "BPS_growth": "2.44",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "半導体の設計・開発受託"
+   "theme": "半導体の設計・開発受託",
+   "checked_on": "2026-10-13"
   },
   "8439": {
    "name": "東京センチュリー",
@@ -1250,8 +1466,12 @@
    "EPS_ratio": "2.20",
    "BPS_growth": "2.73",
    "dividend_cuts": [],
+   "yuho_progressive": true,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：あり／DOE：なし",
-   "theme": "未確認（インバウンド・データセンターとも利益額は非開示）"
+   "theme": "未確認（インバウンド・データセンターとも利益額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "8425": {
    "name": "みずほリース",
@@ -1272,8 +1492,12 @@
    "EPS_ratio": "2.92",
    "BPS_growth": "2.39",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "航空機リース（Aircastle の持分法。有報は「業績も大きく伸長」と記載、金額は非開示）"
+   "theme": "航空機リース（Aircastle の持分法。有報は「業績も大きく伸長」と記載、金額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "8793": {
    "name": "ＮＥＣキャピタルソリューション",
@@ -1294,8 +1518,12 @@
    "EPS_ratio": "2.61",
    "BPS_growth": "1.65",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "GIGAスクール第2期など官公庁のICTリース（一過性の更新需要）"
+   "theme": "未確認（GIGAスクール第2期は成約高・契約実行高の増加として記載。利益寄与は非開示で、リース事業の増益理由には挙がっていない）",
+   "checked_on": "2026-10-13"
   },
   "2498": {
    "name": "オリエンタルコンサルタンツホールディングス",
@@ -1316,8 +1544,12 @@
    "EPS_ratio": "5.19",
    "BPS_growth": "3.33",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：記載なし／DOE：なし",
-   "theme": "国土強靭化（防災・減災、インフラ維持管理の建設コンサル）"
+   "theme": "国土強靭化（防災・減災、インフラ維持管理の建設コンサル）",
+   "checked_on": "2026-10-13"
   },
   "3139": {
    "name": "ラクト・ジャパン",
@@ -1338,8 +1570,12 @@
    "EPS_ratio": "4.48",
    "BPS_growth": "2.78",
    "dividend_cuts": [],
+   "yuho_progressive": true,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：あり／DOE：なし",
-   "theme": "該当なし"
+   "theme": "該当なし",
+   "checked_on": "2026-10-13"
   },
   "7811": {
    "name": "中本パックス",
@@ -1360,8 +1596,12 @@
    "EPS_ratio": "2.43",
    "BPS_growth": "1.85",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし（IR資料は未確認）／DOE：有報に記載なし（IR資料は未確認）",
-   "theme": "半導体・電子部品向け機能性材料"
+   "theme": "半導体・電子部品向け機能性材料（IT・工業材関連の区分。半導体単独の金額は非開示）",
+   "checked_on": "2026-10-13"
   },
   "7095": {
    "name": "ＭａｃｂｅｅＰｌａｎｅｔ",
@@ -1382,8 +1622,12 @@
    "EPS_ratio": "26.24",
    "BPS_growth": "138.80",
    "dividend_cuts": [],
+   "yuho_progressive": false,
+   "yuho_doe": false,
+   "yuho_doe_value": "",
    "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認（データ解析・AI による成果報酬型の LTV マーケティングが本業。当期は主要顧客の影響で減収減益）"
+   "theme": "未確認（データ解析・AI による成果報酬型の LTV マーケティングが本業。当期は主要顧客の影響で減収減益）",
+   "checked_on": ""
   }
  }
 }

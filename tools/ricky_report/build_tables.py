@@ -7,8 +7,9 @@
 assemble.py から import して使う（load() で読み込んでから各関数を呼ぶ）。
 
 - verify.json: workflows/verify.js の結果（collect_verify.py でまとめたもの）。複数渡すと後のものを優先。
-- labels.json: 人が確かめて決めた表記。theme（テーマ性の表記）・doe（DOE の表記）・evidence（根拠を直接書く銘柄）。
-  複数渡すと後のものを優先（前回の表記を引き継ぎ、今回の分で上書きする）。
+- labels.json: 人が確かめて決めた表記。theme（テーマ性の表記）・doe（DOE の表記）・evidence（根拠を直接書く銘柄）、
+  ノート用の補足 theme_note・policy_note・numbers_note・caution。複数渡すと後のものを優先
+  （research/data/*/labels.json を古い順にすべて渡せば、前回までの表記を引き継いで今回の分で上書きできる）。
 """
 import argparse
 import csv
@@ -18,7 +19,9 @@ from pathlib import Path
 
 rows, series = {}, {}
 research, review, fragile = {}, {}, {}
-MANUAL = {"theme": {}, "doe": {}, "evidence": {}}
+checked_on = {}  # 銘柄コード → 調査・点検した日（verify.json の親フォルダ名 research/data/<日付>/）
+MANUAL = {"theme": {}, "doe": {}, "evidence": {}, "theme_note": {}, "policy_note": {}, "numbers_note": {},
+          "caution": {}}
 
 
 def load(results, verify_paths=(), label_paths=()):
@@ -30,9 +33,11 @@ def load(results, verify_paths=(), label_paths=()):
     series.update(json.loads((res / "series.json").read_text(encoding="utf-8")))
     for p in verify_paths:
         verify = json.loads(Path(p).read_text(encoding="utf-8"))
+        day = Path(p).resolve().parent.name
         for b in verify.get("passers", []):
             for st in (b.get("research") or {}).get("stocks", []):
                 research[st["code"]] = st
+                checked_on[st["code"]] = day
             for rv in (b.get("review") or {}).get("reviews", []):
                 review[rv["code"]] = rv
         for b in verify.get("fragile", []):
@@ -215,16 +220,18 @@ def evidence_rows():
            "|---|---|---|---|---|---|"]
     order = passed_rows(False)[1] + passed_rows(True)[1]
     for i, c in enumerate(order, 1):
-        if c in MANUAL["evidence"]:
-            e = MANUAL["evidence"][c]
-            out.append(f"| {i} | {rows[c]['銘柄名']}（{c}） | {theme_text(c)} | {e['text']} | {e['verdict']} | {e['source']} |")
-            continue
         t = (research.get(c) or {}).get("theme") or {}
         rv = review.get(c) or {}
-        ev = re.sub(r"^(有報|2\d{3}/\d+期の有報)[^。]{0,20}(による|より)。", "", t.get("evidence", ""))
-        ev = _short(ev, 180).replace("|", "／") or "未確認"
-        verdict = rv.get("theme_verdict", "未点検")
-        out.append(f"| {i} | {rows[c]['銘柄名']}（{c}） | {theme_text(c)} | {ev} | {verdict} | {_sources(c)} |")
+        e = MANUAL["evidence"].get(c) or {}
+        if e.get("text"):
+            ev = e["text"]  # 人が確かめて書き直した根拠
+        else:
+            ev = re.sub(r"^(有報|2\d{3}/\d+期の有報)[^。]{0,20}(による|より)。", "", t.get("evidence", ""))
+            ev = _short(ev, 180).replace("|", "／") or "未確認"
+        verdict = e.get("verdict") or rv.get("theme_verdict", "未点検")
+        if c in MANUAL["theme_note"]:
+            verdict += f"（表記は本体の判断: {MANUAL['theme_note'][c]}）"
+        out.append(f"| {i} | {rows[c]['銘柄名']}（{c}） | {theme_text(c)} | {ev} | {verdict} | {e.get('source') or _sources(c)} |")
     return out
 
 

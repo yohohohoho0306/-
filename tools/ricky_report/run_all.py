@@ -2,8 +2,8 @@
 
     python tools/ricky_report/run_all.py --as-of 2026-10-13 --out results/full
 
-有報は .cache/edinet、株価・分割・配当の履歴は .cache/prices にキャッシュする（同じ日なら取り直さない）。
-途中で止まっても、もう一度実行すればキャッシュの続きから進む。
+有報は .cache/edinet、株価・分割・配当の履歴は .cache/prices にキャッシュする。株価のキャッシュは実行した日ごとの
+ファイルなので、別の日には取り直す。途中で止まっても、もう一度実行すればキャッシュの続きから進む。
 """
 
 from __future__ import annotations
@@ -24,7 +24,9 @@ from jpstock.prices import fetch_actions, fetch_prices  # noqa: E402
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--as-of", required=True, help="基準日 YYYY-MM-DD（株価の日付・有報を探す基準）")
+    p.add_argument("--as-of", required=True,
+                   help="基準日 YYYY-MM-DD（有報を探す期間の終わりと出力ファイル名）。株価は実行した時点の最新の終値になるので、"
+                        "実行する日（東証の取引終了後）にする。実際の株価の日付は CSV の「株価日付」の列で確かめる")
     p.add_argument("--out", default="results/full", help="出力先（既定: results/full）")
     p.add_argument("--cache-dir", default=str(ROOT / ".cache"), help="キャッシュの親フォルダ（既定: .cache）")
     p.add_argument("--sleep", type=float, default=0.5, help="EDINET API の呼び出し間隔（秒）")
