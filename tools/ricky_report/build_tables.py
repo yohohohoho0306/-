@@ -10,6 +10,9 @@ assemble.py から import して使う（load() で読み込んでから各関�
 - labels.json: 人が確かめて決めた表記。theme（テーマ性の表記）・doe（DOE の表記）・evidence（根拠を直接書く銘柄）、
   ノート用の補足 theme_note・policy_note・numbers_note・caution。複数渡すと後のものを優先
   （research/data/*/labels.json を古い順にすべて渡せば、前回までの表記を引き継いで今回の分で上書きできる）。
+  値に null を書くと、前回までの表記を消す。doe に「DOEの採用なし」と書くと、DOE を採っていない扱いになる。
+  evidence・theme_note・policy_note・numbers_note はその日の調査についての文なので、後の日の verify.json で
+  調べ直した銘柄では使わない（labels.json と verify.json の日付は、どちらも親フォルダ名 research/data/<日付>/）。
 """
 import argparse
 import csv
@@ -22,6 +25,10 @@ research, review, fragile = {}, {}, {}
 checked_on = {}  # 銘柄コード → 調査・点検した日（verify.json の親フォルダ名 research/data/<日付>/）
 MANUAL = {"theme": {}, "doe": {}, "evidence": {}, "theme_note": {}, "policy_note": {}, "numbers_note": {},
           "caution": {}}
+LABEL_DAY = {key: {} for key in MANUAL}  # 表記を書いた日（labels.json の親フォルダ名）
+TIED = ("evidence", "theme_note", "policy_note", "numbers_note")  # その日の調査についての文
+NO_DOE = ("未確認", "DOEの採用なし", "DOEの記載なし", "有報にDOEの記載なし", "なし")  # DOE を採っていない書き方
+DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def load(results, verify_paths=(), label_paths=()):
@@ -45,8 +52,25 @@ def load(results, verify_paths=(), label_paths=()):
                 fragile[st["code"]] = st
     for p in label_paths:
         labels = json.loads(Path(p).read_text(encoding="utf-8"))
+        day = Path(p).resolve().parent.name
         for key in MANUAL:
-            MANUAL[key].update(labels.get(key, {}))
+            for code, v in labels.get(key, {}).items():
+                if v is None:  # null で前回までの表記を消す
+                    MANUAL[key].pop(code, None)
+                    LABEL_DAY[key].pop(code, None)
+                else:
+                    MANUAL[key][code] = v
+                    LABEL_DAY[key][code] = day
+    for key in TIED:  # 後の日に調べ直した銘柄では、前の調査についての文を使わない
+        for code in list(MANUAL[key]):
+            if newer_research(code, LABEL_DAY[key].get(code, "")):
+                del MANUAL[key][code]
+
+
+def newer_research(code, label_day):
+    """表記を書いた日より後の日に調べ直したか（日付の分からないものは比べない）."""
+    day = checked_on.get(code, "")
+    return bool(DAY_RE.fullmatch(day) and DAY_RE.fullmatch(label_day or "") and day > label_day)
 
 
 def num(v):
@@ -76,15 +100,22 @@ def _policy_raw(code):
     return None
 
 
+def _doe_found(code):
+    """調査担当が DOE の採用を見つけたときの文。見つからなければ None."""
+    p = _policy_raw(code)
+    d = (p.get("doe") or "").strip() if isinstance(p, dict) else ""
+    return d if d and not d.startswith(NO_DOE) else None
 
 
 def doe_adopted(code):
-    """DOE を配当の指標に使っているか（会社資料・有報で確認した表記 MANUAL["doe"] に載っているもの）."""
+    """DOE を配当の指標に使っているか。人が決めた表記 MANUAL["doe"] を優先し、無ければ調査担当の結果、
+    調べていなければ有報を機械的に見た結果."""
     if code in MANUAL["doe"]:
-        return True
+        v = (MANUAL["doe"][code] or "").strip()
+        return bool(v) and not v.startswith(NO_DOE)
     p = _policy_raw(code)
     if isinstance(p, dict):
-        return False  # 調査済みで DOE の記載なし
+        return _doe_found(code) is not None
     return bool(rows[code]["DOE"])
 
 
@@ -94,9 +125,9 @@ def policy_text(code):
     if isinstance(p, dict):
         prog = {"累進配当を明記": "累進：あり", "累進の明記なし": "累進：記載なし",
                 "未確認": "累進：有報に記載なし（IR資料は未確認）"}.get(p["progressive"], p["progressive"])
-        if code in MANUAL["doe"]:
-            doe = MANUAL["doe"][code]
-        elif p["doe"].startswith("未確認"):
+        if doe_adopted(code):
+            doe = MANUAL["doe"].get(code) or _doe_found(code)
+        elif (MANUAL["doe"].get(code) or p.get("doe") or "").startswith("未確認"):
             doe = "DOE：有報に記載なし（IR資料は未確認）"
         else:
             doe = "DOE：なし"
@@ -131,6 +162,33 @@ def theme_text(code):
     if label.startswith("該当なし"):
         return "該当なし（確認範囲）"
     return re.split(r"[（(]", label)[0].strip()
+
+
+def theme_kind(label):
+    """テーマ性の区分（未確認・該当なし・あり）."""
+    label = (label or "").strip()
+    if not label or label.startswith("未確認"):
+        return "未確認"
+    return "該当なし" if label.startswith("該当なし") else "あり"
+
+
+def stale_labels():
+    """前の日に書いた表記（theme・doe）と、後の日に調べ直した結果の区分が違う銘柄.
+
+    [(コード, 項目, 表記, 調べ直した結果)]。表記が優先されるので、labels.json で書き直すか null で消す。"""
+    out = []
+    for code, v in MANUAL["theme"].items():
+        if code in research and newer_research(code, LABEL_DAY["theme"].get(code)):
+            got = theme_full(code)[0]
+            if theme_kind(v) != theme_kind(got):
+                out.append((code, "テーマ性", v, got))
+    for code, v in MANUAL["doe"].items():
+        if code in research and newer_research(code, LABEL_DAY["doe"].get(code)):
+            found = _doe_found(code)
+            if doe_adopted(code) != (found is not None):
+                p = _policy_raw(code)
+                out.append((code, "DOE", v, found or (p.get("doe") if isinstance(p, dict) else p) or "未確認"))
+    return out
 
 
 def mark(code):

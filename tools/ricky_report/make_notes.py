@@ -97,7 +97,8 @@ def auto_block(code: str, as_of: str, report: Path) -> list[str]:
     reason = r["第1段階 不合格項目"] or r["第2段階 不合格項目"] or r["第1段階 未確認項目"] or r["第2段階 未確認項目"]
     lines = [AUTO_START, "", f"## {as_of} の判定: {r['判定']}" + ("" if passed else f"（{reason}）"), ""]
     if B.MANUAL["caution"].get(code):
-        lines += [f"> [!WARNING] {B.MANUAL['caution'][code]}", ""]
+        written = B.LABEL_DAY["caution"].get(code, "")
+        lines += [f"> [!WARNING] {B.MANUAL['caution'][code]}" + (f"（{written} に確認）" if written else ""), ""]
     lines += ["| 項目 | 値 |", "|---|---|"]
     cuts = r["減配期"].split()
     items = [

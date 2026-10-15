@@ -1,11 +1,13 @@
 """エージェントに確かめてもらう銘柄の入力 JSON（passers_N.json・fragile_N.json）を作る.
 
     python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> \
-        [--only-new research/data/<前回>/passers.json] [--skip-checked research/data/*/checked.json] [--batch 8]
+        [--only-new [research/data/<前回>/passers.json]] [--skip-checked research/data/*/checked.json] [--batch 8]
 
 - passers_N.json: 通過銘柄。--only-new を付けると、前回の passers.json にあって直近の決算期が変わっていない銘柄
   （前回の調査をそのまま使える銘柄）を除く。新しく通過した銘柄と、続けて通過して新しい有報が出た銘柄が残る。
-  --no-recheck-updated も付けると、新しく通過した銘柄だけが残る（月次の実行用）。
+  --no-recheck-updated も付けると、新しく通過した銘柄だけが残る。--only-new の後のファイルを省くと、
+  判定の基準日より前で決算期の入ったいちばん新しい passers.json を使う（prev_passers.py）。
+  --only-new を付けないと、通過したすべての銘柄が残る（前回とは比べない）。
   数値・10期の系列・スクリプトの注記・有報の配当政策の本文が入る。workflows/verify.js が読む。
 - fragile_N.json: 第2段階で落ちた銘柄のうち、分割・併合・変則決算・会計基準の変更・報告書のつなぎ目などの
   調整が不合格理由に関係しうるもの（調整の誤りで落ちていないかを確かめる）。--skip-checked を付けると、
@@ -18,7 +20,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import prev_passers  # noqa: E402
 
 # 分割・併合の検出や割り戻し、つなぎ目のずれ、変則決算、会計基準の変更、個別の値、無配とみなした期の注記
 ADJUST_WORDS = ("を検出", "割り戻した", "ずれる", "変則決算", "会計基準が", "個別の値", "無配とみなした")
@@ -79,9 +85,10 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("results")
     p.add_argument("out")
-    p.add_argument("--only-new", help="前回の passers.json。そこにあって直近の決算期が同じ通過銘柄を除く")
+    p.add_argument("--only-new", nargs="?", const="auto",
+                   help="前回の passers.json（省くと自動で選ぶ）。そこにあって直近の決算期が同じ通過銘柄を除く")
     p.add_argument("--no-recheck-updated", action="store_true",
-                   help="--only-new と一緒に使う。続けて通過した銘柄は、新しい有報が出ていても調べ直さない（月次の実行用）")
+                   help="--only-new と一緒に使う。続けて通過した銘柄は、新しい有報が出ていても調べ直さない")
     p.add_argument("--skip-checked", nargs="*", default=[], help="research/data/*/checked.json。確認済みの不通過銘柄を除く")
     p.add_argument("--batch", type=int, default=8)
     args = p.parse_args()
@@ -90,13 +97,17 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     rows = {r["コード"]: r for r in csv.DictReader(open(max(res.glob("ricky_all_*.csv")), encoding="utf-8-sig"))}
     series = json.loads((res / "series.json").read_text(encoding="utf-8"))
-    prev = json.loads(Path(args.only_new).read_text(encoding="utf-8"))["stocks"] if args.only_new else {}
+    prev = {}
+    if args.only_new:
+        doc, prev_path = prev_passers.load(None if args.only_new == "auto" else args.only_new, prev_passers.as_of_of(res))
+        prev = doc["stocks"]
+        print(f"前回: {prev_path}")
     checked = {}
     for f in args.skip_checked:
         checked.update(json.loads(Path(f).read_text(encoding="utf-8")).get("fragile", {}))
 
     def reusable(c):  # 前回調べて、その後に新しい有報が出ていない通過銘柄（月次は新しい有報があっても再利用）
-        return c in prev and (args.no_recheck_updated or prev[c]["latest_period_end"] == rows[c]["直近決算期末"])
+        return c in prev and (args.no_recheck_updated or prev[c].get("latest_period_end") == rows[c]["直近決算期末"])
 
     passer_codes = [c for c, r in rows.items() if r["判定"] == "通過" and c in series and not reusable(c)]
     fragile_codes = [c for c, r in rows.items() if c in series and fragile(r, series[c])
@@ -109,8 +120,9 @@ def main() -> int:
         {"passers": {c: rows[c]["直近決算期末"] for c in passer_codes},
          "fragile": {c: rows[c]["直近決算期末"] for c in fragile_codes}}, ensure_ascii=False, indent=1), encoding="utf-8")
     new_ones = [c for c in passer_codes if c not in prev]
-    print(f"passers {len(passers)} 銘柄（新しく通過 {len(new_ones)}・続けて通過で新しい有報 {len(passers) - len(new_ones)}）"
-          f" → {nb} バッチ、fragile {len(fragiles)} 銘柄 → {nf} バッチ（{out}）")
+    detail = (f"新しく通過 {len(new_ones)}・続けて通過で新しい有報 {len(passers) - len(new_ones)}" if args.only_new
+              else "通過したすべての銘柄。前回とは比べていない")
+    print(f"passers {len(passers)} 銘柄（{detail}） → {nb} バッチ、fragile {len(fragiles)} 銘柄 → {nf} バッチ（{out}）")
     skipped = sum(1 for c, r in rows.items() if c in series and fragile(r, series[c])) - len(fragiles)
     if skipped:
         print(f"確認済みで除いた不通過銘柄: {skipped}")
