@@ -5,6 +5,7 @@
 
 - passers_N.json: 通過銘柄。--only-new を付けると、前回の passers.json にあって直近の決算期が変わっていない銘柄
   （前回の調査をそのまま使える銘柄）を除く。新しく通過した銘柄と、続けて通過して新しい有報が出た銘柄が残る。
+  --no-recheck-updated も付けると、新しく通過した銘柄だけが残る（月次の実行用）。
   数値・10期の系列・スクリプトの注記・有報の配当政策の本文が入る。workflows/verify.js が読む。
 - fragile_N.json: 第2段階で落ちた銘柄のうち、分割・併合・変則決算・会計基準の変更・報告書のつなぎ目などの
   調整が不合格理由に関係しうるもの（調整の誤りで落ちていないかを確かめる）。--skip-checked を付けると、
@@ -79,6 +80,8 @@ def main() -> int:
     p.add_argument("results")
     p.add_argument("out")
     p.add_argument("--only-new", help="前回の passers.json。そこにあって直近の決算期が同じ通過銘柄を除く")
+    p.add_argument("--no-recheck-updated", action="store_true",
+                   help="--only-new と一緒に使う。続けて通過した銘柄は、新しい有報が出ていても調べ直さない（月次の実行用）")
     p.add_argument("--skip-checked", nargs="*", default=[], help="research/data/*/checked.json。確認済みの不通過銘柄を除く")
     p.add_argument("--batch", type=int, default=8)
     args = p.parse_args()
@@ -92,8 +95,8 @@ def main() -> int:
     for f in args.skip_checked:
         checked.update(json.loads(Path(f).read_text(encoding="utf-8")).get("fragile", {}))
 
-    def reusable(c):  # 前回調べて、その後に新しい有報が出ていない通過銘柄
-        return c in prev and prev[c]["latest_period_end"] == rows[c]["直近決算期末"]
+    def reusable(c):  # 前回調べて、その後に新しい有報が出ていない通過銘柄（月次は新しい有報があっても再利用）
+        return c in prev and (args.no_recheck_updated or prev[c]["latest_period_end"] == rows[c]["直近決算期末"])
 
     passer_codes = [c for c, r in rows.items() if r["判定"] == "通過" and c in series and not reusable(c)]
     fragile_codes = [c for c, r in rows.items() if c in series and fragile(r, series[c])

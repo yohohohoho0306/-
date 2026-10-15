@@ -21,12 +21,40 @@ Ricky流スクリーニングの次回分を基準日 YYYY-MM-DD で進めて。
 ```
 
 - 「ultracode」（または文中の「ワークフローを使って」）は、手順5でエージェントを並べて動かす Workflow ツールを使ってよいという合図。無ければ Claude はワークフローを使えないので、手順5は Agent ツールで1バッチずつ動かすか、テーマ性・配当方針を「未確認」のままにする。
-- 判定だけでよいときは「手順1〜4だけ」と書く。
+- 月1回の実行は「research/next-run.md の『月次の実行』を基準日 YYYY-MM-DD（今日）で進めて」と頼む。年1回の全面更新（7月以降）は「全面更新」と書く。
 
 ## いつやるか
 
 - 3月決算の会社（通過銘柄の大半）は6月下旬に有報を出すので、**全面更新は7月以降に年1回**。
 - 3月決算以外の会社は年中に有報を出し、株価は毎日動く。**月1回〜四半期に1回、判定だけやり直す**と、新しく通過・脱落した銘柄が分かる。新しく通過した銘柄が出たら、その銘柄だけ手順5で調べる。
+
+## 月次の実行（月1回）
+
+月次では、判定をやり直して前回との変化をまとめ、新しく通過した銘柄だけを調べる。続けて通過した銘柄は、新しい有報が出ていても前回の調査を使う（テーマ性・配当方針の見直しは年1回の全面更新で行う）。
+
+1. 準備（下の手順1）。
+2. 判定（手順2）。`--as-of` は今日。
+3. 新しく通過した銘柄があれば、その銘柄だけを調べる（手順5）。入力は次のように作り、`fragile: []`（不通過銘柄の確認は全面更新で）で verify.js を流す。結果を `research/data/<今日>/verify.json` にまとめ、表記を `research/data/<今日>/labels.json` に書く。新しく通過した銘柄が無ければ飛ばす。
+   ```bash
+   python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> \
+     --only-new research/data/<前回>/passers.json --no-recheck-updated
+   ```
+4. 要約を書く。新しく通過・脱落（理由）・印の変化・新しい有報と配当政策の記載の変化・境界に近い銘柄・株価の日付・洗い出しで新しく出た銘柄・未調査の銘柄が出る。
+   ```bash
+   python tools/ricky_report/monthly_summary.py --as-of YYYY-MM-DD --results results/full \
+     --prev research/data/<前回>/passers.json \
+     --verify research/data/*/verify.json --labels research/data/*/labels.json --checked research/data/*/checked.json
+   ```
+   洗い出しで新しく出た銘柄があれば、手順4のとおり有報で確かめ、結果を要約に書き足す。
+5. ノートを更新する（銘柄ノートの数値・判定・印が今日の株価になり、`research/data/<今日>/passers.json` が来月の「前回」になる）。
+   ```bash
+   python tools/ricky_report/make_notes.py --as-of YYYY-MM-DD --results results/full \
+     --verify research/data/*/verify.json --labels research/data/*/labels.json \
+     --report research/runs/YYYY-MM-DD.md --report-label "YYYY-MM-DD の月次の判定"
+   ```
+6. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足し、コミットしてプッシュする。報告は要約の「新しく通過」「脱落」「印の変化」を短く伝える。
+
+全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
 
 ## 手順
 

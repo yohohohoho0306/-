@@ -15,12 +15,12 @@ import sys
 from pathlib import Path
 
 
-def main() -> int:
-    out = Path(sys.argv[1] if len(sys.argv) > 1 else "results/full")
+def find(out: Path) -> tuple[list[dict], str]:
+    """洗い出しの結果（銘柄ごとの dict）と CSV のファイル名を返す."""
     csv_path = max(out.glob("ricky_all_*.csv"))
     rows = {r["コード"]: r for r in csv.DictReader(open(csv_path, encoding="utf-8-sig"))}
     series = json.loads((out / "series.json").read_text(encoding="utf-8"))
-    hits = 0
+    hits = []
     for code, r in rows.items():
         if r["判定"] not in ("通過", "第2段階 不通過", "第2段階 判定不能") or code not in series:
             continue
@@ -32,12 +32,20 @@ def main() -> int:
             growth, ratio = float(r["BPS伸び率"] or "nan"), float(r["EPS倍率"] or "nan")
         except ValueError:
             growth = ratio = float("nan")
-        extreme = growth < 0.6 or growth > 6 or ratio < 0.3 or ratio > 15
-        if jumps or extreme:
-            hits += 1
-            print(f"{code} {r['銘柄名']} [{r['判定']}] BPS伸び率 {r['BPS伸び率']} EPS倍率 {r['EPS倍率']} "
-                  f"不合格 {r['第2段階 不合格項目'] or '-'} | BPS の飛び: {', '.join(jumps) or 'なし'}")
-    print(f"{hits} 銘柄（{csv_path.name}）")
+        if jumps or growth < 0.6 or growth > 6 or ratio < 0.3 or ratio > 15:
+            hits.append({"code": code, "name": r["銘柄名"], "status": r["判定"], "latest_period_end": r["直近決算期末"],
+                         "bps_growth": r["BPS伸び率"], "eps_ratio": r["EPS倍率"],
+                         "failures": r["第2段階 不合格項目"], "jumps": jumps})
+    return hits, csv_path.name
+
+
+def main() -> int:
+    out = Path(sys.argv[1] if len(sys.argv) > 1 else "results/full")
+    hits, name = find(out)
+    for h in hits:
+        print(f"{h['code']} {h['name']} [{h['status']}] BPS伸び率 {h['bps_growth']} EPS倍率 {h['eps_ratio']} "
+              f"不合格 {h['failures'] or '-'} | BPS の飛び: {', '.join(h['jumps']) or 'なし'}")
+    print(f"{len(hits)} 銘柄（{name}）")
     return 0
 
 

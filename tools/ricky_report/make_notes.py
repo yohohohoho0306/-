@@ -32,6 +32,7 @@ AUTO_MARK = "<!-- auto:start"
 AUTO_START = (AUTO_MARK + "（tools/ricky_report/make_notes.py が書き換える。手で書くのはこの外に。"
               "frontmatter は自動の項目だけ書き換え、手で足したプロパティ・タグは残す） -->")
 AUTO_END = "<!-- auto:end -->"
+REPORT_LABEL = ""  # main() で決める
 MEMO = "\n## メモ\n\n（自由に書いてよい。make_notes.py はこの欄を書き換えない）\n"
 MANAGED_KEYS = ("title", "date", "tags", "aliases", "code", "status", "mark", "first_passed", "last_run")
 AUTO_TAGS = {"ricky-screening", "通過", "脱落"}
@@ -174,7 +175,7 @@ def auto_block(code: str, as_of: str, report: Path) -> list[str]:
         lines.append(f"| {run} | {how} | {st.get('mark') or 'なし'} | {st.get('theme', '')} |")
     if not passed:
         lines.append(f"| {as_of} | {r['判定']} | | |")
-    lines += ["", f"Related: [{as_of} の全社版レポート]({link(report, STOCKS)}) · [銘柄ノートの一覧](INDEX.md) · "
+    lines += ["", f"Related: [{REPORT_LABEL}]({link(report, STOCKS)}) · [銘柄ノートの一覧](INDEX.md) · "
               f"[次回の進め方](../next-run.md)", "", AUTO_END]
     return lines
 
@@ -265,7 +266,7 @@ def write_index(as_of: str, report: Path) -> None:
             r = B.rows.get(c)
             lines.append(f"- [{p.stem}]({encode(p.name)}): {r['判定'] if r else '今回の対象外'}")
     lines += ["", "⚠ はノートの先頭に注意書き（判定の読み方に関わる点）があるもの。", "",
-              f"Related: [{as_of} の全社版レポート]({link(report, STOCKS)}) · [調査ノートの入口](../INDEX.md)", ""]
+              f"Related: [{REPORT_LABEL}]({link(report, STOCKS)}) · [調査ノートの入口](../INDEX.md)", ""]
     (STOCKS / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -275,10 +276,13 @@ def main() -> int:
     p.add_argument("--results", default="results/full")
     p.add_argument("--verify", nargs="*", default=[], help="research/data/*/verify.json を古い順にすべて")
     p.add_argument("--labels", nargs="*", default=[], help="research/data/*/labels.json を古い順にすべて")
-    p.add_argument("--report", required=True, help="今回のレポート（ノートからリンクする）")
+    p.add_argument("--report", required=True, help="今回のレポート（ノートからリンクする）。月次は research/runs/<日付>.md")
+    p.add_argument("--report-label", help="リンクの文字（既定: 「<as-of> の全社版レポート」。月次は「<as-of> の月次の判定」など）")
     a = p.parse_args()
     B.load(a.results, a.verify, a.labels)
     report = Path(a.report).resolve()
+    global REPORT_LABEL
+    REPORT_LABEL = a.report_label or f"{a.as_of} の全社版レポート"
     STOCKS.mkdir(parents=True, exist_ok=True)
 
     passers = [c for c, r in B.rows.items() if r["判定"] == "通過"]

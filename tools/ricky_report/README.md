@@ -13,11 +13,12 @@ Ricky流スクリーニングを全上場会社で回し、確かめ、レポー
 | 1 | `run_all.py` | 全上場会社で判定し、`results/full/` に CSV・Markdown・`series.json`（10期の系列・注記・有報の配当政策）を出す。`--as-of` は実行する日にする |
 | 2 | `diff_passers.py` | 前回の `research/data/<日付>/passers.json` と比べ、新しく通過・続けて通過（新しい有報と配当政策の記載の変化）・脱落を出す |
 | 3 | `scan_anomalies.py` | 10期の系列から、分割・併合の調整漏れを疑う飛び（BPS の 0.7 倍以下・1.6 倍以上など）を出す |
-| 4 | `prepare_verify.py` | エージェントに確かめてもらう銘柄の入力（`passers_N.json`・`fragile_N.json`・`selected.json`）を作る。`--only-new`・`--skip-checked` で確認済みの銘柄を除く |
+| 4 | `prepare_verify.py` | エージェントに確かめてもらう銘柄の入力（`passers_N.json`・`fragile_N.json`・`selected.json`）を作る。`--only-new`・`--skip-checked` で確認済みの銘柄を除く（月次は `--no-recheck-updated` で新しく通過した銘柄だけ） |
 | 5 | `workflows/verify.js` | Workflow ツールで実行。通過銘柄を調査担当と反証役が、判定が変わりうる不通過銘柄を監査担当が、有報の原本で確かめる |
 | 6 | `collect_verify.py` | ワークフローの journal.jsonl から結果を集め、`research/data/<日付>/verify.json` と `checked.json` にする |
 | 7 | `assemble.py`（`build_tables.py` を使う） | テンプレート（`report_template.tmpl` を今回のフォルダに写したもの）に表と文章のパーツを入れて、レポートを作る |
 | 8 | `make_notes.py` | `research/stocks/` の銘柄ノートと一覧、`passers.json` を書く（ノートの「メモ」の欄と、手で足したプロパティ・タグは残す） |
+| — | `monthly_summary.py` | 月次の判定の要約（`research/runs/<日付>.md`）を書く。前回との変化・境界に近い銘柄・未調査の銘柄など |
 | — | `usage.py` | 会話記録から、モデルの呼び出し回数と読み込んだトークンを数える（[費用と時間の目安](../../research/costs.md) の記録用） |
 
 ## 作り直しの確認
