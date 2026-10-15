@@ -11,7 +11,7 @@ export const meta = {
 
 // 2026-10-13 の実行（research/runs/2026-10-13.md）で使ったワークフローを、次回も使えるように整理したもの。
 // 実行: Workflow({ scriptPath: 'tools/ricky_report/workflows/verify.js', args: { dir: '<絶対パス>', repo: '<リポジトリの絶対パス>', passers: [0, 1], fragile: [0] } })
-// 初めて使うときは passers: [0], fragile: [] の1バッチで試し、結果の形を確かめてから残りを流す。
+// 2026-10-15 に passers: [0]（6371 の1銘柄）, fragile: [] で試し、collect_verify.py まで結果の形が揃うことを確かめた。
 // 結果は collect_verify.py で journal.jsonl から research/data/<日付>/verify.json にまとめる。
 
 const DIR = args.dir
