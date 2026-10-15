@@ -7,8 +7,8 @@ aliases: [続行の手順]
 
 # 次回の進め方
 
-> [!IMPORTANT]
-> このノートと道具は、ブランチ `claude/dividend-increase-screening-k08eyg` にある（2026-10-13 時点。リポジトリの既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` にはまだ無い）。既定のブランチに統合するまでは、最初にこのブランチに切り替える。
+> [!NOTE]
+> このノートと道具は、リポジトリの既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` にある（2026-10-15 に作業のブランチ `claude/dividend-increase-screening-k08eyg` から統合した）。新しいセッション・毎月の自動実行・clone は、そのまま既定のブランチから始めればよい。
 
 ## Claude への頼み方
 
@@ -16,8 +16,8 @@ aliases: [続行の手順]
 
 ```text
 ultracode
-ブランチ claude/dividend-increase-screening-k08eyg に切り替えてから、research/next-run.md を読んで、
-Ricky流スクリーニングの次回分を基準日 YYYY-MM-DD で進めて。結果は research/ に残してコミットしてプッシュ。
+research/next-run.md を読んで、Ricky流スクリーニングの次回分を基準日 YYYY-MM-DD で進めて。
+結果は research/ に残してコミットしてプッシュし、既定のブランチへのプルリクエストを作って。
 ```
 
 - 「ultracode」（または文中の「ワークフローを使って」）は、手順5でエージェントを並べて動かす Workflow ツールを使ってよいという合図。無ければ Claude はワークフローを使えないので、手順5は Agent ツールで1バッチずつ動かすか、テーマ性・配当方針を「未確認」のままにする。
@@ -52,7 +52,7 @@ Ricky流スクリーニングの次回分を基準日 YYYY-MM-DD で進めて。
      --verify research/data/*/verify.json --labels research/data/*/labels.json \
      --report research/runs/YYYY-MM-DD.md --report-label "YYYY-MM-DD の月次の判定"
    ```
-6. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足し、コミットしてプッシュする。報告は要約の「新しく通過」「脱落」「印の変化」を短く伝える。
+6. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足し、コミットしてプッシュする。頼まれていれば既定のブランチへのプルリクエストを作る（マージは利用者が行う。マージしないと翌月の実行が今月の結果を使えない）。報告は要約の「新しく通過」「脱落」「印の変化」を短く伝える。
 
 全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
 
@@ -61,7 +61,6 @@ Ricky流スクリーニングの次回分を基準日 YYYY-MM-DD で進めて。
 ### 1. 準備
 
 ```bash
-git checkout claude/dividend-increase-screening-k08eyg   # 既定のブランチに統合するまで
 pip install -r requirements.txt pytest pypdf              # pypdf は手順5でエージェントが有報の PDF を読むのに使う
 python -m pytest -q
 python -c "import os; print('EDINET_API_KEY: 設定済み' if os.environ.get('EDINET_API_KEY') else 'EDINET_API_KEY: 未設定')"
@@ -163,7 +162,7 @@ python tools/ricky_report/make_notes.py --as-of YYYY-MM-DD --results results/ful
 
 ## Obsidian で開く
 
-- このリポジトリを手元に clone し、上のブランチに切り替えてから、Obsidian の「フォルダを保管庫として開く」でリポジトリのフォルダを選ぶ。`.obsidian/app.json`（相対パスの markdown リンク、コードのフォルダは検索から除外）が入っている。
+- このリポジトリを手元に clone し、Obsidian の「フォルダを保管庫として開く」でリポジトリのフォルダを選ぶ。`.obsidian/app.json`（相対パスの markdown リンク、コードのフォルダは検索から除外）が入っている。
 - 最新にするには `git pull`（Obsidian Git プラグインでも可）。
 - 自分のメモは銘柄ノートの「メモ」の欄に、自分のタグ・プロパティは frontmatter に足してよい（次回の更新でも残る）。`stocks/INDEX.md` には書き足さない。コミットしてプッシュすれば、次回の Claude もメモを読める。
 

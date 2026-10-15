@@ -10,8 +10,8 @@ Rickyさん流の増配株3段階スクリーニングを、EDINET の有価証�
 
 Obsidian では、このリポジトリのフォルダを保管庫（vault）として開く（開き方は [次回の進め方](next-run.md) の最後）。次に作業するときは、まず [次回の進め方](next-run.md) を読む。
 
-> [!IMPORTANT]
-> このノートと道具は、ブランチ `claude/dividend-increase-screening-k08eyg` にある（2026-10-13 時点。既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` にはまだ無い）。新しいセッションや clone では、最初にこのブランチに切り替える。
+> [!NOTE]
+> このノートと道具は、リポジトリの既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` にある（2026-10-15 に作業のブランチ `claude/dividend-increase-screening-k08eyg` から統合した）。
 
 ## 最新の結果（2026-10-13）
 
