@@ -30,49 +30,70 @@ research/next-run.md を読んで、Ricky流スクリーニングの次回分を
 
 ## 月次の実行（毎月14日。土日祝なら前の営業日）
 
-2026-10-15 に利用者が決めたやり方。定期実行（ルーチン）は毎月10〜14日の朝 7:53（日本時間）に起動し、実行日だけ最後まで進める。ルーチンの設定と、ルーチンに渡す文面は [月次の自動実行の設定](monthly-routine.md)。
+2026-10-15 に利用者が決めたやり方。定期実行（ルーチン）は毎月10〜16日の朝 7:53（日本時間）に起動し、実行日（またはその後の取り直しの日）だけ最後まで進める。ルーチンの設定と、ルーチンに渡す文面は [月次の自動実行の設定](monthly-routine.md)。
 
-- **実行日**：14日。14日が土日・祝日（東証の休業日）なら、その前の営業日（多くは金曜日）。`python tools/ricky_report/run_day.py` が「run」なら実行日、「skip」なら何もせず終える。
+- **実行日**：14日。14日が土日・祝日（東証の休業日）なら、その前の営業日（多くは金曜日）。`python tools/ricky_report/run_day.py` が `run YYYY-MM-DD` を出したら始め、`skip` なら何もせず終える。実行日に失敗した月は、その月の実行が終わるまで次の日以降の起動（16日まで）で取り直す（「終わった」の決め方は run_day.py の冒頭）。
+- **基準日**：run_day.py が `run` の後ろに出した日付（日本時間の今日）。コンテナの `date` は UTC で、7:53 の起動では前の日になるので使わない。下の `<基準日>`・`YYYY-MM-DD` はすべてこの日付。
+- **株価**：9時の取引開始より前に動くので、前の営業日の終値になる。
 - **調べる範囲**：通過したすべての銘柄（新しく通過した銘柄も、続けて通過した銘柄も）。不通過銘柄は確認済みを除く。
-- **有報のキャッシュ**：ブランチ `claude/data-cache` に圧縮して置く（約16MB）。最初に戻し、最後に保存する。保存のたびに古い圧縮ファイルと、もう使わない古い書類一覧・有報を消す。
+- **作業フォルダ**：システムプロンプトにあるスクラッチパッドの下の `verify-<基準日>`（絶対パス。リポジトリの外）。
+- **有報のキャッシュ**：ブランチ `claude/data-cache` に圧縮して置く（約16MB）。最初に戻し、プルリクエストの後に保存する。保存のたびに古い圧縮ファイルと、もう使わない古い書類一覧・有報を消す。
 
 手順：
 
-1. 実行日か確かめる。「skip」なら終わり。
+1. 実行日か確かめる。`skip` なら「今日は実行日ではない（今月の実行日は …）」とだけ報告して終える。終了コードが 0 でない（jpholiday が無いなど）なら、理由を報告して終える。
    ```bash
    pip install -r requirements.txt pytest pypdf
    python tools/ricky_report/run_day.py
    ```
-2. 準備（下の手順1）と、キャッシュの復元。
+2. 準備（下の「1. 準備」：テストと API キーの有無）。既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` に向けた、前の月の「月次の判定」のプルリクエストがマージされずに残っていれば、番号を報告に書く（その月の結果は既定のブランチに無いので、今月の「前回」にはならない）。キャッシュを戻す。restore が終了コード 1 で終わったら（ネットワーク・認証の失敗）、キャッシュなしでは始めず、理由を報告して終える。
    ```bash
    python tools/ricky_report/cache_sync.py restore
    ```
-3. 判定（手順2）。`--as-of` は今日。キャッシュがあれば十数分（2026-10-15 の試しで11分24秒）。
-4. 調べる（手順5）。通過したすべての銘柄と、確認済みでない不通過銘柄を選ぶ。
+3. 判定（下の「2. 全上場会社の判定」）。`--as-of` は基準日。キャッシュがあれば十数分（2026-10-15 の試しで11分24秒）。
+4. 調整漏れの洗い出し（下の「4. 調整漏れの洗い出し」）。月次の要約（手順7）の「洗い出しで新しく出た銘柄」に出る銘柄（前回までに確かめていないもの）を有報の原本で確かめ、確かめた結果を記録する（記録すると翌月から出ない）。
+   ```bash
+   python tools/ricky_report/mark_checked.py research/data/<基準日>/checked.json --results results/full \
+     --code <コード> --note "<何を確かめ、どうだったか>"
+   ```
+   調整漏れでスクリプトを直したときは、テストを足して手順3からやり直す（この月はマージしない。手順10）。
+5. 調べる（下の「5. 通過銘柄と、判定が変わりうる不通過銘柄を調べる」）。
    ```bash
    python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> --skip-checked research/data/*/checked.json
    ```
-   verify.js をすべてのバッチで流し、`collect_verify.py research/data/<今日>/verify.json <journal> --selected <作業フォルダ>/selected.json` でまとめる。反証役の判断が前回の表記と違う銘柄だけ、`research/data/<今日>/labels.json` に新しい表記を書く（前回までの labels.json はそのまま引き継がれる）。
-5. 要約を書く（`research/runs/<今日>.md`）。洗い出しで新しく出た銘柄があれば、手順4のとおり有報で確かめて要約に書き足す。
+   - 出力の「→ N バッチ」に合わせて、Workflow ツールで `tools/ricky_report/workflows/verify.js` を `args: {dir: "<作業フォルダ>", repo: "<リポジトリの絶対パス（pwd）>", passers: [0, …, N-1], fragile: [0, …, M-1]}` で流す。
+   - journal は `find ~/.claude/projects -path '*/<runId>/journal.jsonl'` で探す（runId は Workflow ツールの結果に出る `wf_…`）。まとめる：
+     ```bash
+     python tools/ricky_report/collect_verify.py research/data/<基準日>/verify.json <journal.jsonl> --selected <作業フォルダ>/selected.json
+     ```
+   - 合否の確かめ方：collect_verify の出力「research R・review V・fragile F」で、R と V が prepare_verify の passers の銘柄数と、F が fragile の銘柄数と同じなら揃っている。足りなければ、Workflow を `resumeFromRunId` で1回だけ流し直す（終わったバッチは流し直されない）。それでも足りない銘柄は、前回までの調査（無ければ「未確認」）のまま進め、銘柄名を報告に書く。R が 0 など結果の形が崩れているときは、手順6以降に進まず、結果をコミットしてプッシュし、マージせずに報告する。
+6. 表記を決める（`research/data/<基準日>/labels.json`。形式は [前回の labels.json](data/2026-10-13/labels.json)。前回までの labels.json は引き継がれ、今回の分が優先される）。
+   - 新しく通過した銘柄と、DOE の有無が変わった銘柄は `doe` に書く（採っていれば「DOE 3%以上（下限）」のような表記、やめたなら `"DOEの採用なし"`）。書かなければ、調査担当の結果（DOE の採用を見つけたかどうか）がそのまま使われる。
+   - 反証役の判断が今の表記と違う銘柄は `theme` を書き直す。前回までの表記をやめて今回の調査の表記にするなら、値に `null` を書く。
+   - 今回調べ直した銘柄では、前回までの `evidence`・`theme_note`・`policy_note`・`numbers_note`（その日の調査についての文）は自動で使われなくなる。要るなら今回の分を書く。`caution`（ノートの先頭の注意）は今回の数値で確かめ直し、当てはまらなくなったら `null` を書く。
+7. 要約を書く（`research/runs/<基準日>.md`）。「前回までの表記と今回の調査が食い違う銘柄」が残っていれば、手順6に戻って決めてから書き直す。
    ```bash
    python tools/ricky_report/monthly_summary.py --as-of YYYY-MM-DD --results results/full \
-     --prev research/data/<前回>/passers.json \
      --verify research/data/*/verify.json --labels research/data/*/labels.json --checked research/data/*/checked.json
    ```
-6. ノートを更新する（銘柄ノートの数値・判定・印が今日の株価になり、`research/data/<今日>/passers.json` が来月の「前回」になる）。
+   前回（`--prev`）は省いてよい（基準日より前で、銘柄ごとの決算期が入ったいちばん新しい `research/data/*/passers.json` を自動で選ぶ。2026-11 の最初の実行では 2026-10-13）。
+8. ノートを更新する（銘柄ノートの数値・判定・印が今回の株価になり、`research/data/<基準日>/passers.json` が来月の「前回」になる）。
    ```bash
    python tools/ricky_report/make_notes.py --as-of YYYY-MM-DD --results results/full \
      --verify research/data/*/verify.json --labels research/data/*/labels.json \
      --report research/runs/YYYY-MM-DD.md --report-label "YYYY-MM-DD の月次の判定"
    ```
-7. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足す。キャッシュを保存する。
-   ```bash
-   python tools/ricky_report/cache_sync.py save --as-of YYYY-MM-DD
-   ```
-8. コミットしてプッシュし、既定のブランチへのプルリクエストを作る。テストが通り、スクリプト（`jpstock/`・`tools/`）を変えていなければマージする。スクリプトを変えたときはマージせず、何を直したかを報告する（マージしないと、翌月の実行が今月の結果を使えない）。
-9. 報告：新しく通過・脱落・印の変化・境界に近い銘柄・テーマ性や配当方針の表記を変えた銘柄を短く。
+9. [入口](INDEX.md) の「最新の結果」：見出しの日付を基準日にし、今月の要約（`runs/<基準日>.md`）へのリンクを先頭に足す（全社版レポートへのリンクは残す）。
+10. コミットの直前に `python -m pytest -q` を流す。コミットしてプッシュし、既定のブランチ `claude/japanese-stock-info-tool-sq2gwt` へのプルリクエスト（題名「月次の判定 YYYY-MM-DD」）を作る。テストが通り、`git fetch origin claude/japanese-stock-info-tool-sq2gwt && git diff --name-only origin/claude/japanese-stock-info-tool-sq2gwt -- jpstock tools tests` が空（スクリプトを変えていない）なら、merge commit の方法でマージする。空でなければマージせず、何を直したかを報告する（マージしないと、翌月の実行が今月の結果を使えない）。衝突したときもマージせずに報告する。
+11. キャッシュを保存する。失敗しても結果はプルリクエストに入っているので、そのまま進めて「キャッシュの保存に失敗」と報告に書く（翌月は前回のキャッシュから始まり、足りない有報を取り直す）。
+    ```bash
+    python tools/ricky_report/cache_sync.py save --as-of YYYY-MM-DD
+    ```
+12. 報告：新しく通過・脱落・印の変化・境界に近い銘柄・テーマ性や配当方針の表記を変えた銘柄を短く（要約の各節から）。マージしたか、しなかった理由。
 
-範囲を「新しく通過した銘柄だけ」に減らすときは、手順4の `prepare_verify.py` に `--only-new research/data/<前回>/passers.json --no-recheck-updated` を足す（エージェントの使用量が大きく減る。[費用と時間の目安](costs.md)）。全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
+途中で止まったとき（エラー、EDINET・Yahoo の障害、利用制限）：そこまでの結果（`research/data/<基準日>/` の verify.json・checked.json など）をコミットしてプッシュし、プルリクエストは作ってもマージしない。キャッシュは保存しない（保存すると run_day.py がその月を終わったとみなし、翌日以降の起動で取り直さなくなる）。どこで止まったか、何が残っているかを報告する。翌日以降の起動（16日まで）で、手順1から取り直す。
+
+範囲を「新しく通過した銘柄だけ」に減らすときは、手順5の `prepare_verify.py` に `--only-new --no-recheck-updated` を足す（エージェントの使用量が大きく減る。[費用と時間の目安](costs.md)）。全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
 
 ## 手順
 
@@ -103,11 +124,11 @@ python tools/ricky_report/run_all.py --as-of YYYY-MM-DD --out results/full
 ### 3. 前回との差分
 
 ```bash
-python tools/ricky_report/diff_passers.py results/full research/data/2026-10-13/passers.json
+python tools/ricky_report/diff_passers.py results/full
 ```
 
 - 「新しく通過」「続けて通過（新しい有報の有無と、有報の配当政策の記載の変化）」「脱落（落ちた条件）」が出る。
-- 前回分は `research/data/` のうち、`passers.json` に `latest_period_end` があるいちばん新しい日付のもの（2026-10-12 は手作業の調査で形が違うので使わない）。
+- 前回分は、判定の基準日より前で `passers.json` に `latest_period_end` があるいちばん新しいものを自動で選ぶ（2026-10-12 は手作業の調査で形が違うので使わない）。別のものと比べるときは2つ目の引数にそのファイルを渡す。
 
 ### 4. 調整漏れの洗い出し
 
@@ -117,6 +138,7 @@ python tools/ricky_report/scan_anomalies.py results/full
 
 - BPS が前期の 0.7 倍以下・1.6 倍以上に飛ぶ期、BPS 伸び率・EPS 倍率が極端な銘柄を出す。2026-10-13 は 14 銘柄が出て、確かめた結果は `research/data/2026-10-13/checked.json` の `anomalies` と [既知の問題と未確認の点](known-issues.md) にある。前回と同じ銘柄・同じ決算期なら確かめ直さなくてよい。
 - 新しく出た銘柄は有報の原本（純利益 ÷ EPS、純資産 ÷ BPS、発行済株式数）で、実際の増減か調整漏れかを確かめる。調整漏れならスクリプトを直し、テスト（`tests/test_screening.py`）を足して、2 からやり直す。
+- 確かめた結果は `tools/ricky_report/mark_checked.py` で `research/data/<今回>/checked.json` の `anomalies` に書く（同じ銘柄・同じ決算期は、次回から「新しく出た」に出ない）。
 
 ### 5. 通過銘柄と、判定が変わりうる不通過銘柄を調べる
 
@@ -125,22 +147,23 @@ python tools/ricky_report/scan_anomalies.py results/full
 1. 入力を作る。
    ```bash
    python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> \
-     --only-new research/data/2026-10-13/passers.json --skip-checked research/data/*/checked.json
+     --only-new --skip-checked research/data/*/checked.json
    ```
-   - 通過銘柄は「新しく通過した銘柄」と「続けて通過して新しい有報が出た銘柄」だけが残る（新しい有報が無ければ前回の調査を使う）。年1回の全面更新では、ほぼ全銘柄に新しい有報が出ているので、通過銘柄のほぼ全部が対象になる。
+   - 通過銘柄は「新しく通過した銘柄」と「続けて通過して新しい有報が出た銘柄」だけが残る（新しい有報が無ければ前回の調査を使う）。`--only-new` の後に前回の passers.json を書かなければ、手順3と同じ決め方で選ぶ。`--only-new` を付けなければ、通過したすべての銘柄が残る（月次の実行）。年1回の全面更新では、ほぼ全銘柄に新しい有報が出ているので、通過銘柄のほぼ全部が対象になる。
    - 不通過銘柄は、調整が不合格理由に関係しうるもののうち、確認済みで決算期が同じものを除く。2026-10-13 のデータでは 40 銘柄が選ばれ、そのうち 20 銘柄は確認済み、20 銘柄は未確認（[既知の問題と未確認の点](known-issues.md)）。
 2. Workflow ツールで `tools/ricky_report/workflows/verify.js` を実行する。`args: {dir: "<作業フォルダの絶対パス>", repo: "<リポジトリの絶対パス>", passers: [0, 1, …], fragile: [0, 1, …]}`。通過銘柄は「調査担当 → 反証役」の組、不通過銘柄は監査担当が、有報の原本で確かめる。
    - このスクリプトは 2026-10-13 に使ったものを、Web 検索中心から有報の原本中心に書き直したもので、この形ではまだ流していない。最初は `passers: [0], fragile: []` の1バッチで試し、結果の形を確かめてから残りを流す。
-3. 結果をまとめる。journal は `~/.claude/projects/<プロジェクト>/<セッションID>/subagents/workflows/<runId>/journal.jsonl`（runId は Workflow ツールの結果に出る `wf_…`）。
+3. 結果をまとめる。journal は `find ~/.claude/projects -path '*/<runId>/journal.jsonl'` で探す（runId は Workflow ツールの結果に出る `wf_…`。場所は `~/.claude/projects/<プロジェクト>/<セッションID>/subagents/workflows/<runId>/journal.jsonl`）。
    ```bash
    python tools/ricky_report/collect_verify.py research/data/<今回>/verify.json <journal.jsonl> \
      --selected <作業フォルダ>/selected.json
    ```
    `--selected` を付けると、確かめた不通過銘柄が `research/data/<今回>/checked.json` に記録される（次回 `--skip-checked` で除ける）。
-4. 反証役の判断を読み、表記を `research/data/<今回>/labels.json` に書く。形式は [前回の labels.json](data/2026-10-13/labels.json) と同じ。
-   - `theme`（テーマ性の表記）・`doe`（DOE の表記）
+4. 反証役の判断を読み、表記を `research/data/<今回>/labels.json` に書く。形式は [前回の labels.json](data/2026-10-13/labels.json) と同じ。値に `null` を書くと前回までの表記を消す。
+   - `theme`（テーマ性の表記）・`doe`（DOE の表記。DOE をやめた銘柄は `"DOEの採用なし"`。書かなければ調査担当の結果を使う）
    - `evidence`（根拠の文を書き直すとき）、`theme_note`・`policy_note`（反証役と違う表記にした理由など）
-   - `numbers_note`（点検の後にスクリプトを直したときの断り書き）、`caution`（判定の読み方に関わる注意。ノートの先頭に出る）
+   - `numbers_note`（点検の後にスクリプトを直したときの断り書き）、`caution`（判定の読み方に関わる注意。ノートの先頭に、書いた日と一緒に出る）
+   - `evidence`・`theme_note`・`policy_note`・`numbers_note` は、その日の調査についての文なので、後の日に調べ直した銘柄では使われなくなる。
 5. 「判定が変わる可能性あり」が出た不通過銘柄は、スクリプトの誤りとして手順4と同じように直す。
 
 ### 6. レポートを作る

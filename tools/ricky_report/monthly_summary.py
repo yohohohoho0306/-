@@ -1,12 +1,14 @@
 """月次の判定の要約（research/runs/<日付>.md）を書く。前回の通過銘柄と比べた変化を、そのまま読める形にする.
 
     python tools/ricky_report/monthly_summary.py --as-of YYYY-MM-DD --results results/full \
-        --prev research/data/<前回>/passers.json \
+        [--prev research/data/<前回>/passers.json] \
         --verify research/data/*/verify.json --labels research/data/*/labels.json \
         --checked research/data/*/checked.json
 
-出すもの: 件数、新しく通過・脱落（理由）・印が変わった銘柄、新しい有報が出た通過銘柄と配当政策の記載の変化、
+出すもの: 件数、新しく通過・脱落（理由）・印が変わった銘柄、テーマ性・配当方針の表記が変わった銘柄、
+前回までの表記（labels.json）と今回の調査の区分が食い違う銘柄、新しい有報が出た通過銘柄と配当政策の記載の変化、
 条件の境界に近い通過銘柄、株価の日付が古い銘柄、調整漏れの洗い出しで新しく出た銘柄、まだ調べていない銘柄。
+--prev を省くと、基準日より前で決算期の入ったいちばん新しい passers.json を使う（prev_passers.py）。
 数値は判定結果の CSV の値。売買の推奨はしない。
 """
 
@@ -20,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_tables as B  # noqa: E402
+import prev_passers  # noqa: E402
 import scan_anomalies  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +55,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--as-of", required=True)
     p.add_argument("--results", default="results/full")
-    p.add_argument("--prev", required=True, help="前回の research/data/<日付>/passers.json")
+    p.add_argument("--prev", help="前回の research/data/<日付>/passers.json（省くと自動で選ぶ）")
     p.add_argument("--verify", nargs="*", default=[])
     p.add_argument("--labels", nargs="*", default=[])
     p.add_argument("--checked", nargs="*", default=[])
@@ -60,8 +63,8 @@ def main() -> int:
     a = p.parse_args()
     B.load(a.results, a.verify, a.labels)
     rows = B.rows
-    prev_doc = json.loads(Path(a.prev).read_text(encoding="utf-8"))
-    prev, prev_run = prev_doc["stocks"], prev_doc["run"]
+    prev_doc, prev_path = prev_passers.load(a.prev, a.as_of)
+    prev, prev_run = prev_doc["stocks"], prev_doc.get("run") or prev_path.parent.name
     anomalies_checked = {}
     for f in a.checked:
         anomalies_checked.update(json.loads(Path(f).read_text(encoding="utf-8")).get("anomalies", {}))
@@ -113,17 +116,35 @@ def main() -> int:
           for c in changed] or ["- なし"]
     L.append("")
 
-    updated = [c for c in stay if rows[c]["直近決算期末"] != prev[c]["latest_period_end"]]
+    texts = [(c, k, prev[c].get(k), now_text) for c in stay
+             for k, now_text in (("theme", B.theme_text(c)), ("policy", B.policy_text(c)))]
+    texts = [(c, k, was, cur) for c, k, was, cur in texts if was is not None and was != cur]
+    L += [f"## テーマ性・配当方針の表記が変わった銘柄（{len(texts)}）", "",
+          "続けて通過した銘柄のうち、表の表記が前回の passers.json と違うもの。", ""]
+    L += [f"- {c} {rows[c]['銘柄名']}: {'テーマ性' if k == 'theme' else '配当方針'} 「{was}」→「{cur}」"
+          for c, k, was, cur in texts] or ["- なし"]
+    L.append("")
+
+    stale = B.stale_labels()
+    L += [f"## 前回までの表記と今回の調査が食い違う銘柄（{len(stale)}）", "",
+          "labels.json の表記（前の日に書いたもの）が優先されて表に出ている。今回の調査・点検を読んで、"
+          "今回の labels.json で書き直すか、null で消して今回の調査の表記にする。", ""]
+    L += [f"- {c} {rows[c]['銘柄名'] if c in rows else ''}: {k} 表記「{v}」／今回の調査「{got}」" for c, k, v, got in stale] or ["- なし"]
+    L.append("")
+
+    updated = [c for c in stay if prev[c].get("latest_period_end") and rows[c]["直近決算期末"] != prev[c]["latest_period_end"]]
     L += [f"## 新しい有報が出た通過銘柄（{len(updated)}）", "",
-          "テーマ性・配当方針は前回の調査のまま。配当政策の記載（有報の文を機械的に見た累進・DOE）が変わったものは見直す。", ""]
+          "配当政策の記載（有報の文を機械的に見た累進・DOE）が前回と変わったものは、配当方針の表記を見直す。"
+          "行の終わりに、テーマ性・配当方針を今回調べ直したかを書いた。", ""]
     for c in updated:
         r, q = rows[c], prev[c]
+        again = B.checked_on.get(c, "") > prev_run
         line = f"- {c} {r['銘柄名']}: 決算期 {q['latest_period_end']} → {r['直近決算期末']}"
         if "yuho_doe" in q:
             was = (q["yuho_progressive"], q["yuho_doe"], q["yuho_doe_value"])
             cur = (bool(r["累進"]), bool(r["DOE"]), r["DOE数値"])
             line += "、配当政策の記載 " + ("変化なし" if was == cur else f"**変化あり**（累進 {was[0]}→{cur[0]}、DOE {was[1]}→{cur[1]}、数値 {was[2] or '-'}→{cur[2] or '-'}）")
-        L.append(line)
+        L.append(line + ("。今回調べ直した" if again else "。テーマ性・配当方針は前回までの調査のまま"))
     if not updated:
         L.append("- なし")
     L.append("")
@@ -160,7 +181,8 @@ def main() -> int:
     out = Path(a.out) if a.out else ROOT / "research" / "runs" / f"{a.as_of}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(L), encoding="utf-8")
-    print(f"written {out}（新しく通過 {len(new)}・脱落 {len(gone)}・印の変化 {len(changed)}・未調査 {len(todo)}）")
+    print(f"written {out}（前回 {prev_path}。新しく通過 {len(new)}・脱落 {len(gone)}・印の変化 {len(changed)}・"
+          f"表記の変化 {len(texts)}・表記の食い違い {len(stale)}・未調査 {len(todo)}）")
     return 0
 
 

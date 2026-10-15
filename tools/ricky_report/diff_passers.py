@@ -1,6 +1,8 @@
 """前回の通過銘柄（research/data/<日付>/passers.json）と今回の判定結果を比べる.
 
-    python tools/ricky_report/diff_passers.py results/full research/data/2026-10-13/passers.json
+    python tools/ricky_report/diff_passers.py results/full [research/data/2026-10-13/passers.json]
+
+前回の passers.json を省くと、判定の基準日より前で決算期の入ったいちばん新しいものを使う（prev_passers.py）。
 
 「新しく通過」「続けて通過」「脱落（今回の判定）」を出す。新しく通過した銘柄と、続けて通過して
 新しい有報が出た銘柄は、テーマ性・配当方針を調べ直す（prepare_verify.py --only-new がこの2つを選ぶ）。
@@ -11,16 +13,19 @@
 from __future__ import annotations
 
 import csv
-import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import prev_passers  # noqa: E402
+
 
 def main() -> int:
-    out, prev_path = Path(sys.argv[1]), Path(sys.argv[2])
+    out = Path(sys.argv[1])
     csv_path = max(out.glob("ricky_all_*.csv"))
     rows = {r["コード"]: r for r in csv.DictReader(open(csv_path, encoding="utf-8-sig"))}
-    prev = json.loads(prev_path.read_text(encoding="utf-8"))["stocks"]
+    doc, prev_path = prev_passers.load(sys.argv[2] if len(sys.argv) > 2 else None, prev_passers.as_of_of(out))
+    prev = doc["stocks"]
     now = {c for c, r in rows.items() if r["判定"] == "通過"}
     before = set(prev)
     print(f"今回 {csv_path.name}: 通過 {len(now)}／前回 {prev_path}: 通過 {len(before)}")
@@ -31,7 +36,7 @@ def main() -> int:
     for c in sorted(now & before):
         r, q = rows[c], prev[c]
         line = f"- {c} {r['銘柄名']}"
-        if r["直近決算期末"] != q["latest_period_end"]:
+        if q.get("latest_period_end") and r["直近決算期末"] != q["latest_period_end"]:
             line += f"（新しい有報あり: {r['直近決算期末']}"
             if "yuho_doe" in q:
                 was = (q["yuho_progressive"], q["yuho_doe"], q["yuho_doe_value"])
