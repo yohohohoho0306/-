@@ -21,40 +21,58 @@ research/next-run.md を読んで、Ricky流スクリーニングの次回分を
 ```
 
 - 「ultracode」（または文中の「ワークフローを使って」）は、手順5でエージェントを並べて動かす Workflow ツールを使ってよいという合図。無ければ Claude はワークフローを使えないので、手順5は Agent ツールで1バッチずつ動かすか、テーマ性・配当方針を「未確認」のままにする。
-- 月1回の実行は「research/next-run.md の『月次の実行』を基準日 YYYY-MM-DD（今日）で進めて」と頼む。年1回の全面更新（7月以降）は「全面更新」と書く。
+- 月1回の実行はルーチンが自動で始める（[月次の自動実行の設定](monthly-routine.md)）。手で始めるときは「research/next-run.md の『月次の実行』を基準日 YYYY-MM-DD（今日）で進めて」と頼む。年1回の全面更新（7月以降）は「全面更新」と書く。
 
 ## いつやるか
 
 - 3月決算の会社（通過銘柄の大半）は6月下旬に有報を出すので、**全面更新は7月以降に年1回**。
 - 3月決算以外の会社は年中に有報を出し、株価は毎日動く。**月1回〜四半期に1回、判定だけやり直す**と、新しく通過・脱落した銘柄が分かる。新しく通過した銘柄が出たら、その銘柄だけ手順5で調べる。
 
-## 月次の実行（月1回）
+## 月次の実行（毎月14日。土日祝なら前の営業日）
 
-月次では、判定をやり直して前回との変化をまとめ、新しく通過した銘柄だけを調べる。続けて通過した銘柄は、新しい有報が出ていても前回の調査を使う（テーマ性・配当方針の見直しは年1回の全面更新で行う）。
+2026-10-15 に利用者が決めたやり方。定期実行（ルーチン）は毎月10〜14日の朝 7:53（日本時間）に起動し、実行日だけ最後まで進める。ルーチンの設定と、ルーチンに渡す文面は [月次の自動実行の設定](monthly-routine.md)。
 
-1. 準備（下の手順1）。
-2. 判定（手順2）。`--as-of` は今日。
-3. 新しく通過した銘柄があれば、その銘柄だけを調べる（手順5）。入力は次のように作り、`fragile: []`（不通過銘柄の確認は全面更新で）で verify.js を流す。結果を `research/data/<今日>/verify.json` にまとめ、表記を `research/data/<今日>/labels.json` に書く。新しく通過した銘柄が無ければ飛ばす。
+- **実行日**：14日。14日が土日・祝日（東証の休業日）なら、その前の営業日（多くは金曜日）。`python tools/ricky_report/run_day.py` が「run」なら実行日、「skip」なら何もせず終える。
+- **調べる範囲**：通過したすべての銘柄（新しく通過した銘柄も、続けて通過した銘柄も）。不通過銘柄は確認済みを除く。
+- **有報のキャッシュ**：ブランチ `claude/data-cache` に圧縮して置く（約16MB）。最初に戻し、最後に保存する。保存のたびに古い圧縮ファイルと、もう使わない古い書類一覧・有報を消す。
+
+手順：
+
+1. 実行日か確かめる。「skip」なら終わり。
    ```bash
-   python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> \
-     --only-new research/data/<前回>/passers.json --no-recheck-updated
+   pip install -r requirements.txt pytest pypdf
+   python tools/ricky_report/run_day.py
    ```
-4. 要約を書く。新しく通過・脱落（理由）・印の変化・新しい有報と配当政策の記載の変化・境界に近い銘柄・株価の日付・洗い出しで新しく出た銘柄・未調査の銘柄が出る。
+2. 準備（下の手順1）と、キャッシュの復元。
+   ```bash
+   python tools/ricky_report/cache_sync.py restore
+   ```
+3. 判定（手順2）。`--as-of` は今日。キャッシュがあれば十数分（2026-10-15 の試しで11分24秒）。
+4. 調べる（手順5）。通過したすべての銘柄と、確認済みでない不通過銘柄を選ぶ。
+   ```bash
+   python tools/ricky_report/prepare_verify.py results/full <作業フォルダ> --skip-checked research/data/*/checked.json
+   ```
+   verify.js をすべてのバッチで流し、`collect_verify.py research/data/<今日>/verify.json <journal> --selected <作業フォルダ>/selected.json` でまとめる。反証役の判断が前回の表記と違う銘柄だけ、`research/data/<今日>/labels.json` に新しい表記を書く（前回までの labels.json はそのまま引き継がれる）。
+5. 要約を書く（`research/runs/<今日>.md`）。洗い出しで新しく出た銘柄があれば、手順4のとおり有報で確かめて要約に書き足す。
    ```bash
    python tools/ricky_report/monthly_summary.py --as-of YYYY-MM-DD --results results/full \
      --prev research/data/<前回>/passers.json \
      --verify research/data/*/verify.json --labels research/data/*/labels.json --checked research/data/*/checked.json
    ```
-   洗い出しで新しく出た銘柄があれば、手順4のとおり有報で確かめ、結果を要約に書き足す。
-5. ノートを更新する（銘柄ノートの数値・判定・印が今日の株価になり、`research/data/<今日>/passers.json` が来月の「前回」になる）。
+6. ノートを更新する（銘柄ノートの数値・判定・印が今日の株価になり、`research/data/<今日>/passers.json` が来月の「前回」になる）。
    ```bash
    python tools/ricky_report/make_notes.py --as-of YYYY-MM-DD --results results/full \
      --verify research/data/*/verify.json --labels research/data/*/labels.json \
      --report research/runs/YYYY-MM-DD.md --report-label "YYYY-MM-DD の月次の判定"
    ```
-6. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足し、コミットしてプッシュする。頼まれていれば既定のブランチへのプルリクエストを作る（マージは利用者が行う。マージしないと翌月の実行が今月の結果を使えない）。報告は要約の「新しく通過」「脱落」「印の変化」を短く伝える。
+7. [入口](INDEX.md) の「最新の結果」に今月の要約へのリンクを足す。キャッシュを保存する。
+   ```bash
+   python tools/ricky_report/cache_sync.py save --as-of YYYY-MM-DD
+   ```
+8. コミットしてプッシュし、既定のブランチへのプルリクエストを作る。テストが通り、スクリプト（`jpstock/`・`tools/`）を変えていなければマージする。スクリプトを変えたときはマージせず、何を直したかを報告する（マージしないと、翌月の実行が今月の結果を使えない）。
+9. 報告：新しく通過・脱落・印の変化・境界に近い銘柄・テーマ性や配当方針の表記を変えた銘柄を短く。
 
-全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
+範囲を「新しく通過した銘柄だけ」に減らすときは、手順4の `prepare_verify.py` に `--only-new research/data/<前回>/passers.json --no-recheck-updated` を足す（エージェントの使用量が大きく減る。[費用と時間の目安](costs.md)）。全面更新のレポート（`ricky_screening_full_*.md`）は月次では作らない。
 
 ## 手順
 

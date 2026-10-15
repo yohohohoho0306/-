@@ -18,6 +18,8 @@ Ricky流スクリーニングを全上場会社で回し、確かめ、レポー
 | 6 | `collect_verify.py` | ワークフローの journal.jsonl から結果を集め、`research/data/<日付>/verify.json` と `checked.json` にする |
 | 7 | `assemble.py`（`build_tables.py` を使う） | テンプレート（`report_template.tmpl` を今回のフォルダに写したもの）に表と文章のパーツを入れて、レポートを作る |
 | 8 | `make_notes.py` | `research/stocks/` の銘柄ノートと一覧、`passers.json` を書く（ノートの「メモ」の欄と、手で足したプロパティ・タグは残す） |
+| — | `run_day.py` | 今日が月次の実行日（毎月14日、休業日ならその前の営業日）かを判定する（「run」か「skip」） |
+| — | `cache_sync.py` | 有報のキャッシュをブランチ `claude/data-cache` に圧縮して保存・復元する（古いデータは消す） |
 | — | `monthly_summary.py` | 月次の判定の要約（`research/runs/<日付>.md`）を書く。前回との変化・境界に近い銘柄・未調査の銘柄など |
 | — | `usage.py` | 会話記録から、モデルの呼び出し回数と読み込んだトークンを数える（[費用と時間の目安](../../research/costs.md) の記録用） |
 
