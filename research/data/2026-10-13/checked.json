@@ -1,0 +1,223 @@
+{
+ "run": "2026-10-13",
+ "fragile": {
+  "5714": {
+   "name": "ＤＯＷＡホールディングス",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "4041": {
+   "name": "日本曹達",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "3431": {
+   "name": "宮地エンジニアリンググループ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "7723": {
+   "name": "愛知時計電機",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "9368": {
+   "name": "キムラユニティー",
+   "latest_period_end": "2026-03-31",
+   "overall": "判定が変わる可能性あり",
+   "status_after_fix": "通過"
+  },
+  "2060": {
+   "name": "フィード・ワン",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "1888": {
+   "name": "若築建設",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "4113": {
+   "name": "田岡化学工業",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "6488": {
+   "name": "ヨシタケ",
+   "latest_period_end": "2026-03-31",
+   "overall": "判定が変わる可能性あり",
+   "status_after_fix": "通過"
+  },
+  "5965": {
+   "name": "フジマック",
+   "latest_period_end": "2025-12-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "9639": {
+   "name": "三協フロンテア",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "1384": {
+   "name": "ホクリヨウ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "1867": {
+   "name": "植木組",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "7932": {
+   "name": "ニッピ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "6322": {
+   "name": "タクミナ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "7417": {
+   "name": "南陽",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "8908": {
+   "name": "毎日コムネット",
+   "latest_period_end": "2026-05-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "1930": {
+   "name": "北陸電気工事",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "6484": {
+   "name": "ＫＶＫ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "6874": {
+   "name": "協立電機",
+   "latest_period_end": "2026-06-30",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "8253": {
+   "name": "クレディセゾン",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  },
+  "3443": {
+   "name": "川田テクノロジーズ",
+   "latest_period_end": "2026-03-31",
+   "overall": "不通過で正しい",
+   "status_after_fix": "第2段階 不通過"
+  }
+ },
+ "anomalies": {
+  "7095": {
+   "name": "ＭａｃｂｅｅＰｌａｎｅｔ",
+   "latest_period_end": "2026-04-30",
+   "status": "通過",
+   "note": "上場前の分割の調整漏れ → 7章 #20〜#22 で修正、通過"
+  },
+  "6989": {
+   "name": "北陸電気工業",
+   "latest_period_end": "2026-03-31",
+   "status": "通過",
+   "note": "通過。9期前（2017/3）の EPS 13.27円が低い年だったため倍率が大きい（有報の値どおり。レポート 3-4）"
+  },
+  "6932": {
+   "name": "遠藤照明",
+   "latest_period_end": "2026-03-31",
+   "status": "通過",
+   "note": "通過。9期前（2017/3）の EPS 14.30円が低い年だったため倍率が大きい（有報の値どおり。レポート 3-4）"
+  },
+  "1662": {
+   "name": "石油資源開発",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "赤字の期があり不通過。倍率は赤字明けの低い起点によるもので、判定は変わらない（赤字は分割の調整で変わらない）"
+  },
+  "4404": {
+   "name": "ミヨシ油脂",
+   "latest_period_end": "2025-12-31",
+   "status": "第2段階 不通過",
+   "note": "同上（赤字で不通過）"
+  },
+  "5445": {
+   "name": "東京鐵鋼",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "同上（赤字で不通過）"
+  },
+  "7213": {
+   "name": "レシップホールディングス",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "同上（赤字で不通過）"
+  },
+  "7242": {
+   "name": "カヤバ",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "赤字で不通過。2020/3 期の BPS 0.50倍は大きな赤字（EPS −403円）による実際の減少"
+  },
+  "8016": {
+   "name": "オンワードホールディングス",
+   "latest_period_end": "2026-02-28",
+   "status": "第2段階 不通過",
+   "note": "赤字で不通過。2020/2・2021/2 期の BPS の減少は赤字の期"
+  },
+  "3773": {
+   "name": "アドバンスト・メディア",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "赤字で不通過（2019/3 期の BPS の飛びが実際の増加か調整かは確かめていない）"
+  },
+  "5857": {
+   "name": "ＡＲＥホールディングス",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "赤字で不通過（2026/3 期の BPS の飛びは確かめていない）"
+  },
+  "4251": {
+   "name": "恵和",
+   "latest_period_end": "2025-12-31",
+   "status": "第2段階 不通過",
+   "note": "赤字で不通過（2021/12 期の BPS の飛びは確かめていない）"
+  },
+  "8473": {
+   "name": "ＳＢＩホールディングス",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "BPS 減少（2020/3・2023/3・2025/3）で不通過。2022/3 期の飛びは大幅増益の期で、減少の期とは別"
+  },
+  "6089": {
+   "name": "ウィルグループ",
+   "latest_period_end": "2026-03-31",
+   "status": "第2段階 不通過",
+   "note": "EPS 1.86倍で不通過。2019/3 期の BPS 0.59倍が実際の減少かは確かめていない（判定は変わらない）"
+  }
+ }
+}

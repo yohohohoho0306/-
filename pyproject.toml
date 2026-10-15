@@ -13,6 +13,7 @@ dependencies = [
     "pandas>=2.0",
     "rich>=13.0",
     "matplotlib>=3.7",
+    "requests>=2.28",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +21,7 @@ dev = ["pytest>=7.0"]
 
 [project.scripts]
 jpstock = "jpstock.cli:main"
+jpstock-ricky = "jpstock.screen:main"
 
 [tool.setuptools]
 packages = ["jpstock"]
