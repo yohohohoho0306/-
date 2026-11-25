@@ -79,9 +79,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "鉄道の設備更新・民間建築の電気工事（営業利益235.6億円・前期比131％で過去最高。データセンターは受注段階で、売上・利益の寄与額は非開示）",
+   "checked_on": "2026-11-25"
   },
   "1847": {
    "name": "イチケン",
@@ -185,9 +185,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "3.6% 4.8%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（3.6% 4.8%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 3.6%以上（2026/3期まで）。2027/3期から配当性向40%以上またはDOE 4.8%以上の高い方",
+   "theme": "ビル空調の自動制御・既設改修（環境システム事業の営業利益26.8％増、既設工事17.5％増）",
+   "checked_on": "2026-11-25"
   },
   "2112": {
    "name": "塩水港精糖",
@@ -321,9 +321,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "4.3%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（4.3%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 4.3%を目安（中計、2026年度まで）",
+   "theme": "未確認（医薬品用リン脂質などヘルスケア分野は増益だが、スポットの受託品の寄与が含まれ、テーマとしての継続的な利益寄与は読み取れない）",
+   "checked_on": "2026-11-25"
   },
   "4516": {
    "name": "日本新薬",
@@ -399,9 +399,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "該当なし",
+   "checked_on": "2026-11-25"
   },
   "5363": {
    "name": "東京窯業",
@@ -615,9 +615,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "未確認（インフラ補修・耐震向けのあと施工アンカーが主力だが、当期の販売は前年をやや下回り、テーマの寄与は読み取れない）",
+   "checked_on": "2026-11-25"
   },
   "6023": {
    "name": "ダイハツインフィニアース",
@@ -641,9 +641,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "造船向け舶用機関・メンテナンス（舶用機関関連のセグメント利益96.90億円・前期比5.1％増。売上1.5％減、全社の営業利益0.2％減。デュアルフューエル機関は受注段階）",
+   "checked_on": "2026-11-25"
   },
   "6332": {
    "name": "月島ホールディングス",
@@ -749,9 +749,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "未確認（モビリティ事業はハイブリッド車需要で営業利益21.1％増だが、全社の営業利益は5.6％減で、純利益の増加は負ののれん発生益による）",
+   "checked_on": "2026-11-25"
   },
   "6246": {
    "name": "テクノスマート",
@@ -833,9 +833,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "該当なし",
+   "checked_on": "2026-11-25"
   },
   "6648": {
    "name": "かわでん",
@@ -885,9 +885,9 @@
    "yuho_progressive": true,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載あり／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：あり／DOE：なし",
+   "theme": "防災・減災（非常用発電機の出荷が防災用を中心に堅調。同製品だけの利益は開示なし。直近の中間期は納入の後ろ倒しで出荷減）",
+   "checked_on": "2026-11-25"
   },
   "6741": {
    "name": "日本信号",
@@ -937,9 +937,9 @@
    "yuho_progressive": true,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載あり／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：あり／DOE：なし",
+   "theme": "未確認（半導体工場向けの微粒子計測器事業は当期セグメント営業益14.0%減）",
+   "checked_on": "2026-11-25"
   },
   "6144": {
    "name": "西部電機",
@@ -1021,9 +1021,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "該当なし",
+   "checked_on": "2026-11-25"
   },
   "6912": {
    "name": "菊水ホールディングス",
@@ -1049,9 +1049,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "2%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（2%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 2%以上（還元のベース）",
+   "theme": "データセンター・半導体・EV向け電源評価機器（電源機器群の売上11.6%増、連結営業益6.9%増）",
+   "checked_on": "2026-11-25"
   },
   "6785": {
    "name": "鈴木",
@@ -1077,9 +1077,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "4%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（4%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 4.0%または配当性向50%を目安（下限ではない）",
+   "theme": "スマートフォン・半導体関連の電子部品（部品セグメント利益25.5%増。自動車電装部品を含み、半導体関連だけの内訳は開示なし）",
+   "checked_on": "2026-11-25"
   },
   "6392": {
    "name": "ヤマダコーポレーション",
@@ -1185,9 +1185,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "該当なし",
+   "checked_on": "2026-11-25"
   },
   "8014": {
    "name": "蝶理",
@@ -1291,9 +1291,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "該当なし",
+   "checked_on": "2026-11-25"
   },
   "8154": {
    "name": "加賀電子",
@@ -1319,9 +1319,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "4%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（4%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 4.0%を普通配当の目安（中計2027の期間。下限ではない）",
+   "theme": "AIサーバー需要に伴うメモリ需給逼迫（スポット販売約411億円が売上に寄与。電子部品事業の利益14.0%増は協栄産業の連結化を含み、スポット販売の利益は開示なし）",
+   "checked_on": "2026-11-25"
   },
   "9857": {
    "name": "英和",
@@ -1455,9 +1455,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "電力・データセンターなどインフラ向け設備投資（三菱電機系の商社。電気機器・産業用システムのセグメント利益 6.1億→7.5億円。データセンター向け単独の開示はなく、増益額が最大なのは食品・物流倉庫向け冷熱機器の設備機器）",
+   "checked_on": "2026-11-25"
   },
   "7570": {
    "name": "橋本総業ホールディングス",
@@ -1561,9 +1561,9 @@
    "yuho_progressive": false,
    "yuho_doe": true,
    "yuho_doe_value": "3% 2% 1%",
-   "policy": "累進：有報に記載なし／DOE：有報に記載あり（3% 2% 1%）",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE 3%程度を下限（2026/3〜2028/3期）",
+   "theme": "該当なし（証券業。株式市場の活況による市況連動の増益）",
+   "checked_on": "2026-11-25"
   },
   "8934": {
    "name": "サンフロンティア不動産",
@@ -1639,9 +1639,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "EC物流（大手EC向け3PLセンターの稼働で倉庫事業のセグメント利益 66.1%増の19.54億円）",
+   "checked_on": "2026-11-25"
   },
   "9233": {
    "name": "アジア航測",
@@ -1851,9 +1851,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "未確認（DXは市場環境の一般的な説明にとどまる。増益は自社製品「ZeeM」のストック収益による1セグメントのもので、連結売上高は0.3%増の横ばい）",
+   "checked_on": "2026-11-25"
   },
   "9799": {
    "name": "旭情報サービス",
@@ -1929,9 +1929,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：記載なし／DOE：なし",
+   "theme": "未確認（航空宇宙・防衛向けは増収と書かれているが、その事業だけの利益は開示がなく、属するソリューション事業のセグメント利益は0.72億円と小さい）",
+   "checked_on": "2026-11-25"
   },
   "8439": {
    "name": "東京センチュリー",
@@ -2059,9 +2059,9 @@
    "yuho_progressive": false,
    "yuho_doe": false,
    "yuho_doe_value": "",
-   "policy": "累進：有報に記載なし／DOE：有報に記載なし",
-   "theme": "未確認",
-   "checked_on": ""
+   "policy": "累進：あり／DOE：なし",
+   "theme": "自治体DX（官公庁クラウド事業のセグメント利益 135.9%増の12.02億円。ただし移行期限が2026年3月の基幹システム標準化案件や防災行政無線工事など、案件の進行による増益を含む）",
+   "checked_on": "2026-11-25"
   },
   "3139": {
    "name": "ラクト・ジャパン",
